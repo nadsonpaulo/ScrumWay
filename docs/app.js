@@ -5,7 +5,10 @@ const defaultState = {
   currentUser: null,
   recoveryUser: null,
   users: {
-    admin: { email: 'admin@example.com', password: '123456' }
+    admin: { 
+      email: 'admin@example.com', 
+      password: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92' // Hash de '123456'
+    }
   },
   notes: { admin: '' },
   productVision: { admin: '' },
@@ -48,6 +51,12 @@ function saveState() {
 }
 
 function init() {
+  // Proteção contra Clickjacking (impede que o app rode dentro de um iframe malicioso)
+  if (window.self !== window.top) {
+    window.top.location = window.self.location;
+    return;
+  }
+
   elements = {
     loginSection: document.getElementById('loginSection'),
     registerSection: document.getElementById('registerSection'),
@@ -122,13 +131,28 @@ function toggleTheme() {
   if (elements.btnTheme) elements.btnTheme.textContent = isDark ? 'Tema claro' : 'Tema escuro';
 }
 
-function handleLogin(event) {
+async function hashPassword(password) {
+  const msgUint8 = new TextEncoder().encode(password);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function handleLogin(event) {
   event.preventDefault();
   const username = document.getElementById('loginUsername').value.trim();
   const password = document.getElementById('loginPassword').value;
   const user = state.users[username];
   
-  if (!user || user.password !== password) {
+  if (!user) return showFlash('Credenciais inválidas.', 'danger');
+  
+  const hashedPassword = await hashPassword(password);
+  
+  // Migração: se a senha salva for a antiga em texto puro, atualiza para o hash
+  if (user.password === password) {
+    user.password = hashedPassword;
+    saveState();
+  } else if (user.password !== hashedPassword) {
     return showFlash('Credenciais inválidas.', 'danger');
   }
   
@@ -138,17 +162,22 @@ function handleLogin(event) {
   showView('board');
 }
 
-function handleRegister(event) {
+async function handleRegister(event) {
   event.preventDefault();
   const username = document.getElementById('registerUsername').value.trim();
   const email = document.getElementById('registerEmail').value.trim().toLowerCase();
   const password = document.getElementById('registerPassword').value;
   const confirm = document.getElementById('registerConfirmPassword').value;
 
+  if (username.length < 3) return showFlash('Usuário muito curto.', 'danger');
+  if (password.length < 6) return showFlash('Senha deve ter no mínimo 6 caracteres.', 'danger');
   if (password !== confirm) return showFlash('As senhas não coincidem.', 'danger');
   if (state.users[username]) return showFlash('Usuário já existe.', 'danger');
 
-  state.users[username] = { email, password };
+  state.users[username] = { 
+    email: escapeHtml(email), 
+    password: await hashPassword(password) 
+  };
   state.notes[username] = '';
   state.productVision[username] = '';
   state.dod[username] = '';
@@ -176,11 +205,25 @@ function importData(event) {
   reader.onload = (e) => {
     try {
       const imported = JSON.parse(e.target.result);
-      state = { ...state, ...imported };
+      
+      // Validação básica de esquema
+      if (!imported.users || !Array.isArray(imported.tasks)) {
+        throw new Error('Formato de backup inválido.');
+      }
+      
+      // Mescla segura de estados
+      state = { 
+        ...defaultState, 
+        ...imported,
+        users: { ...defaultState.users, ...(imported.users || {}) },
+        tasks: Array.isArray(imported.tasks) ? imported.tasks : []
+      };
+      
       saveState();
-      location.reload();
+      showFlash('Dados restaurados com sucesso!', 'success');
+      setTimeout(() => location.reload(), 1500);
     } catch (err) {
-      showFlash('Arquivo de backup inválido.', 'danger');
+      showFlash('Erro ao importar: O arquivo não é um backup válido.', 'danger');
     }
   };
   reader.readAsText(file);
@@ -272,8 +315,8 @@ function renderBoard() {
   const members = Array.isArray(state.teamMembers[state.currentUser]) ? state.teamMembers[state.currentUser] : [];
   elements.membersList.innerHTML = members.map(m => `
     <span class="team-member-badge" style="background:${m.color}; color:#fff;">
-      ${m.name}
-      <button class="btn-close btn-close-white ms-2" style="font-size:0.5rem" onclick="deleteMember('${m.name}')"></button>
+      ${escapeHtml(m.name)}
+      <button class="btn-close btn-close-white ms-2" style="font-size:0.5rem" onclick="deleteMember('${escapeHtml(m.name)}')"></button>
     </span>
   `).join('');
 
