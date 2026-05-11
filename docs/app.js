@@ -14,31 +14,11 @@ const defaultState = {
   tasks: []
 };
 
-const state = loadState();
-const elements = {
-  loginSection: document.getElementById('loginSection'),
-  registerSection: document.getElementById('registerSection'),
-  forgotSection: document.getElementById('forgotSection'),
-  resetSection: document.getElementById('resetSection'),
-  boardSection: document.getElementById('boardSection'),
-  flashContainer: document.getElementById('flashContainer'),
-  btnTheme: document.getElementById('btnTheme'),
-  boardUsername: document.getElementById('boardUsername'),
-  membersList: document.getElementById('membersList'),
-  notesText: document.getElementById('notesText'),
-  productVisionText: document.getElementById('productVisionText'),
-  dodText: document.getElementById('dodText'),
-  counts: {
-    stories: document.getElementById('countStories'),
-    todo: document.getElementById('countTodo'),
-    inprogress: document.getElementById('countInProgress'),
-    done: document.getElementById('countDone')
-  }
-};
+let state = loadState();
+let elements = {};
+let editModal;
 
-const editModal = new bootstrap.Modal(document.getElementById('editTaskModal'));
-
-init();
+document.addEventListener('DOMContentLoaded', init);
 
 function loadState() {
   const raw = localStorage.getItem(storageKey);
@@ -55,76 +35,80 @@ function loadState() {
       tasks: Array.isArray(data.tasks) ? data.tasks : []
     };
   }
-  localStorage.setItem(storageKey, JSON.stringify(defaultState));
   return JSON.parse(JSON.stringify(defaultState));
 }
 
-function saveState() { localStorage.setItem(storageKey, JSON.stringify(state)); }
+function saveState() { 
+  try {
+    localStorage.setItem(storageKey, JSON.stringify(state));
+    console.log('State saved');
+  } catch (e) {
+    console.error('Failed to save state:', e);
+  }
+}
 
 function init() {
+  elements = {
+    loginSection: document.getElementById('loginSection'),
+    registerSection: document.getElementById('registerSection'),
+    boardSection: document.getElementById('boardSection'),
+    flashContainer: document.getElementById('flashContainer'),
+    btnTheme: document.getElementById('btnTheme'),
+    boardUsername: document.getElementById('boardUsername'),
+    membersList: document.getElementById('membersList'),
+    notesText: document.getElementById('notesText'),
+    productVisionText: document.getElementById('productVisionText'),
+    dodText: document.getElementById('dodText'),
+    authButtons: document.getElementById('authButtons'),
+    counts: {
+      stories: document.getElementById('countStories'),
+      todo: document.getElementById('countTodo'),
+      inprogress: document.getElementById('countInProgress'),
+      done: document.getElementById('countDone')
+    }
+  };
+
+  const modalEl = document.getElementById('editTaskModal');
+  if (modalEl) editModal = new bootstrap.Modal(modalEl);
+
   document.getElementById('loginForm').addEventListener('submit', handleLogin);
   document.getElementById('registerForm').addEventListener('submit', handleRegister);
-  document.getElementById('forgotForm').addEventListener('submit', handleForgot);
-  document.getElementById('resetForm').addEventListener('submit', handleReset);
   document.getElementById('createTaskForm').addEventListener('submit', handleCreateTask);
   document.getElementById('addMemberForm').addEventListener('submit', handleAddMember);
   document.getElementById('notesForm').addEventListener('submit', handleSaveNotes);
   document.getElementById('productVisionForm').addEventListener('submit', handleSaveProductVision);
   document.getElementById('dodForm').addEventListener('submit', handleSaveDod);
+  
   document.getElementById('backToLoginFromRegister').addEventListener('click', () => showView('login'));
-  document.getElementById('backToLoginFromForgot').addEventListener('click', () => showView('login'));
-  document.getElementById('backToLoginFromReset').addEventListener('click', () => showView('login'));
   document.getElementById('showRegister').addEventListener('click', () => showView('register'));
-  document.getElementById('showForgot').addEventListener('click', () => showView('forgot'));
-  document.getElementById('debugBtn').addEventListener('click', () => {
-    console.log('=== DEBUG INFO ===');
-    console.log('Estado atual:', state);
-    console.log('Usuários:', Object.keys(state.users));
-    console.log('Usuário admin:', state.users.admin);
-    console.log('localStorage:', localStorage.getItem(storageKey));
+  
+  // Backup features
+  document.getElementById('exportDataBtn').addEventListener('click', exportData);
+  document.getElementById('importDataBtn').addEventListener('click', () => document.getElementById('importFile').click());
+  document.getElementById('importFile').addEventListener('change', importData);
 
-    // Abrir ferramentas de desenvolvedor automaticamente
-    if (window.devtools && window.devtools.open) {
-      window.devtools.open();
-    } else {
-      // Fallback para navegadores que suportam
-      try {
-        // Chrome, Edge, Opera
-        if (window.chrome && window.chrome.devtools) {
-          window.chrome.devtools.open();
-        } else {
-          // Firefox
-          if (window.firefox && window.firefox.devtools) {
-            window.firefox.devtools.open();
-          } else {
-            // Safari
-            if (window.safari && window.safari.devtools) {
-              window.safari.devtools.open();
-            } else {
-              // Método genérico - tentar abrir console
-              console.clear();
-              console.log('🔧 Ferramentas de desenvolvedor abertas!');
-              console.log('📊 Dados de debug acima foram impressos.');
-              // Forçar abertura do console em alguns navegadores
-              debugger;
-            }
-          }
-        }
-      } catch (e) {
-        console.log('❌ Não foi possível abrir automaticamente as ferramentas de desenvolvedor.');
-        console.log('📋 Pressione F12 ou clique com o botão direito > Inspecionar para abrir manualmente.');
-      }
-    }
-  });
+  const debugBtn = document.getElementById('debugBtn');
+  if (debugBtn) {
+    debugBtn.addEventListener('click', () => {
+      console.log('=== SCRUMWAY DEBUG ===', state);
+      showFlash('Informações de debug impressas no console.', 'info');
+    });
+  }
+
   document.getElementById('logoutBtn').addEventListener('click', logout);
   document.getElementById('decrementPriority').addEventListener('click', () => adjustPriority(-1));
   document.getElementById('incrementPriority').addEventListener('click', () => adjustPriority(1));
   elements.btnTheme.addEventListener('click', toggleTheme);
-  document.getElementById('selectionPopup').addEventListener('click', (event) => event.stopPropagation());
-  document.addEventListener('click', () => toggleSelectionPopup(false));
+  
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.selection-popup') && !e.target.closest('.badge-clickable')) {
+      toggleSelectionPopup(false);
+    }
+  });
 
   setTheme();
   showView(state.currentUser ? 'board' : 'login');
+  console.info('ScrumWay Initialized');
 }
 
 function setTheme() {
@@ -143,14 +127,15 @@ function handleLogin(event) {
   event.preventDefault();
   const username = document.getElementById('loginUsername').value.trim();
   const password = document.getElementById('loginPassword').value;
-  if (!username || !password) return showFlash('Preencha usuário e senha.', 'danger');
   const user = state.users[username];
-  if (!user) return showFlash('Usuário não encontrado.', 'danger');
-  if (user.password !== password) return showFlash('Senha incorreta.', 'danger');
+  
+  if (!user || user.password !== password) {
+    return showFlash('Credenciais inválidas.', 'danger');
+  }
+  
   state.currentUser = username;
   saveState();
-  showFlash('Login efetuado com sucesso!', 'success');
-  resetForms();
+  showFlash(`Bem-vindo de volta, ${username}!`, 'success');
   showView('board');
 }
 
@@ -160,52 +145,56 @@ function handleRegister(event) {
   const email = document.getElementById('registerEmail').value.trim().toLowerCase();
   const password = document.getElementById('registerPassword').value;
   const confirm = document.getElementById('registerConfirmPassword').value;
-  if (!username || !email || !password || !confirm) return showFlash('Preencha todos os campos.', 'danger');
-  if (password !== confirm) return showFlash('As senhas devem ser iguais.', 'danger');
-  if (state.users[username]) return showFlash('Esse usuário já existe.', 'danger');
-  if (Object.values(state.users).some(u => u.email === email)) return showFlash('Esse email já está cadastrado.', 'danger');
+
+  if (password !== confirm) return showFlash('As senhas não coincidem.', 'danger');
+  if (state.users[username]) return showFlash('Usuário já existe.', 'danger');
+
   state.users[username] = { email, password };
   state.notes[username] = '';
   state.productVision[username] = '';
   state.dod[username] = '';
   state.teamMembers[username] = [];
+  
   saveState();
-  showFlash('Cadastro concluído com sucesso! Faça login.', 'success');
+  showFlash('Conta criada! Agora você pode entrar.', 'success');
   showView('login');
 }
 
-function handleForgot(event) {
-  event.preventDefault();
-  const username = document.getElementById('forgotUsername').value.trim();
-  const email = document.getElementById('forgotEmail').value.trim().toLowerCase();
-  const user = state.users[username];
-  if (!user || user.email !== email) return showFlash('Usuário ou email não encontrado.', 'danger');
-  state.recoveryUser = username;
-  saveState();
-  showFlash('Usuário verificado. Defina a nova senha.', 'info');
-  showView('reset');
+function exportData() {
+  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state));
+  const downloadAnchorNode = document.createElement('a');
+  downloadAnchorNode.setAttribute("href", dataStr);
+  downloadAnchorNode.setAttribute("download", `scrumway_backup_${new Date().toISOString().slice(0,10)}.json`);
+  document.body.appendChild(downloadAnchorNode);
+  downloadAnchorNode.click();
+  downloadAnchorNode.remove();
 }
 
-function handleReset(event) {
-  event.preventDefault();
-  if (!state.recoveryUser) return showFlash('Inicie a recuperação de senha primeiro.', 'danger');
-  const password = document.getElementById('resetPassword').value;
-  const confirm = document.getElementById('resetConfirmPassword').value;
-  if (!password || !confirm) return showFlash('Preencha todos os campos.', 'danger');
-  if (password !== confirm) return showFlash('As senhas devem ser iguais.', 'danger');
-  state.users[state.recoveryUser].password = password;
-  state.recoveryUser = null;
-  saveState();
-  showFlash('Senha redefinida com sucesso! Faça login.', 'success');
-  showView('login');
+function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const imported = JSON.parse(e.target.result);
+      state = { ...state, ...imported };
+      saveState();
+      location.reload();
+    } catch (err) {
+      showFlash('Arquivo de backup inválido.', 'danger');
+    }
+  };
+  reader.readAsText(file);
 }
 
 function handleCreateTask(event) {
   event.preventDefault();
-  const title = document.getElementById('newTaskTitle').value.trim() || 'Nova Tarefa';
+  console.log('Creating task...');
+  const title = document.getElementById('newTaskTitle').value.trim();
   const description = document.getElementById('newTaskDescription').value.trim();
+  
   state.tasks.push({
-    id: crypto.randomUUID(),
+    id: (crypto && crypto.randomUUID) ? crypto.randomUUID() : Math.random().toString(36).substring(2, 11),
     owner: state.currentUser,
     title,
     description,
@@ -214,8 +203,9 @@ function handleCreateTask(event) {
     column: 'stories',
     createdAt: new Date().toISOString()
   });
+  
   saveState();
-  showFlash('Tarefa criada com sucesso.', 'success');
+  showFlash('Tarefa adicionada.', 'success');
   event.target.reset();
   renderBoard();
 }
@@ -223,39 +213,23 @@ function handleCreateTask(event) {
 function handleAddMember(event) {
   event.preventDefault();
   const name = document.getElementById('newMemberName').value.trim();
-  if (!name) return showFlash('Informe o nome do membro.', 'danger');
-  const members = state.teamMembers[state.currentUser] || [];
-  if (members.some(member => member.name === name)) return showFlash('Esse membro já está cadastrado.', 'danger');
-  const colors = ['#f97316','#0ea5e9','#9333ea','#22c55e','#e11d48','#facc15','#14b8f6','#14b8a6','#8b5cf6','#fb7185','#38bdf8'];
-  const available = colors.filter(color => !members.some(member => member.color === color));
-  members.push({ name, color: available[0] || colors[0] });
+  const members = Array.isArray(state.teamMembers[state.currentUser]) ? state.teamMembers[state.currentUser] : [];
+  
+  if (members.some(m => m.name === name)) return showFlash('Membro já existe.', 'danger');
+  
+  const colors = ['#6366f1','#ec4899','#f59e0b','#10b981','#3b82f6','#8b5cf6','#ef4444'];
+  const color = colors[members.length % colors.length];
+  
+  members.push({ name, color });
   state.teamMembers[state.currentUser] = members;
   saveState();
-  showFlash('Membro adicionado com sucesso.', 'success');
   event.target.reset();
   renderBoard();
 }
 
-function handleSaveNotes(event) {
-  event.preventDefault();
-  state.notes[state.currentUser] = elements.notesText.value.trim();
-  saveState();
-  showFlash('Observações salvas.', 'success');
-}
-
-function handleSaveProductVision(event) {
-  event.preventDefault();
-  state.productVision[state.currentUser] = elements.productVisionText.value.trim();
-  saveState();
-  showFlash('Visão do produto salva.', 'success');
-}
-
-function handleSaveDod(event) {
-  event.preventDefault();
-  state.dod[state.currentUser] = elements.dodText.value.trim();
-  saveState();
-  showFlash('Definition of Done salva.', 'success');
-}
+function handleSaveNotes(e) { e.preventDefault(); state.notes[state.currentUser] = document.getElementById('notesText').value; saveState(); showFlash('Notas salvas.'); }
+function handleSaveProductVision(e) { e.preventDefault(); state.productVision[state.currentUser] = document.getElementById('productVisionText').value; saveState(); showFlash('Visão salva.'); }
+function handleSaveDod(e) { e.preventDefault(); state.dod[state.currentUser] = document.getElementById('dodText').value; saveState(); showFlash('DoD salvo.'); }
 
 function logout() {
   state.currentUser = null;
@@ -265,262 +239,184 @@ function logout() {
 
 function showView(view) {
   document.querySelectorAll('.view-section').forEach(sec => sec.classList.add('hidden'));
-  document.getElementById(`${view}Section`).classList.remove('hidden');
-  clearFlash();
+  const section = document.getElementById(`${view}Section`);
+  if (section) section.classList.remove('hidden');
+  
+  elements.authButtons.classList.toggle('hidden', view !== 'board');
   if (view === 'board') renderBoard();
 }
 
 function showFlash(message, type = 'info') {
-  elements.flashContainer.innerHTML = `<div class="alert alert-${type === 'danger' ? 'danger' : type === 'success' ? 'success' : 'info'} flash" role="alert">${message}</div>`;
+  elements.flashContainer.innerHTML = `<div class="alert alert-${type} alert-dismissible fade show shadow-sm" role="alert">
+    ${message}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>`;
+  setTimeout(() => {
+    const alert = elements.flashContainer.querySelector('.alert');
+    if (alert) {
+      const bsAlert = new bootstrap.Alert(alert);
+      bsAlert.close();
+    }
+  }, 4000);
 }
-
-function clearFlash() { elements.flashContainer.innerHTML = ''; }
-
-function resetForms() { document.querySelectorAll('form').forEach(form => form.reset()); }
-
-function getCurrentTasks() { return state.tasks.filter(task => task.owner === state.currentUser); }
-
-function getTeamMembers() { return state.teamMembers[state.currentUser] || []; }
 
 function renderBoard() {
   if (!state.currentUser) return;
-  elements.boardUsername.textContent = state.currentUser;
-  elements.notesText.value = state.notes[state.currentUser] || '';
-  elements.productVisionText.value = state.productVision[state.currentUser] || '';
-  elements.dodText.value = state.dod[state.currentUser] || '';
+  document.getElementById('boardUsername').textContent = state.currentUser;
+  document.getElementById('notesText').value = state.notes[state.currentUser] || '';
+  document.getElementById('productVisionText').value = state.productVision[state.currentUser] || '';
+  document.getElementById('dodText').value = state.dod[state.currentUser] || '';
 
-  const members = getTeamMembers();
-  elements.membersList.innerHTML = members.length
-    ? members.map(member => `<span class="team-member-badge" style="background:${member.color};">${member.name}<button class="btn-close btn-close-white ms-2" type="button" data-member="${member.name}" aria-label="Remover"></button></span>`).join('')
-    : '<p class="text-muted small">Ainda não há membros cadastrados.</p>';
-  elements.membersList.querySelectorAll('.btn-close').forEach(button => button.addEventListener('click', () => deleteMember(button.dataset.member)));
+  const members = Array.isArray(state.teamMembers[state.currentUser]) ? state.teamMembers[state.currentUser] : [];
+  elements.membersList.innerHTML = members.map(m => `
+    <span class="team-member-badge" style="background:${m.color}; color:#fff;">
+      ${m.name}
+      <button class="btn-close btn-close-white ms-2" style="font-size:0.5rem" onclick="deleteMember('${m.name}')"></button>
+    </span>
+  `).join('');
 
-  const tasks = getCurrentTasks();
-  columns.forEach(column => {
-    const container = getColumnContainer(column);
-    const filtered = tasks.filter(task => task.column === column);
+  const userTasks = state.tasks.filter(t => t.owner === state.currentUser);
+  columns.forEach(col => {
+    const colTasks = userTasks.filter(t => t.column === col);
+    const container = document.getElementById(`column${col === 'inprogress' ? 'InProgress' : capitalize(col)}`);
     if (container) {
-      container.innerHTML = filtered.map(taskCard).join('') || '<div class="text-muted small">Nenhuma tarefa.</div>';
+      container.innerHTML = colTasks.map(taskCard).join('');
     }
-    if (elements.counts[column]) {
-      elements.counts[column].textContent = filtered.length;
-    }
+    if (elements.counts[col]) elements.counts[col].textContent = colTasks.length;
   });
+
   enableDragAndDrop();
 }
 
 function taskCard(task) {
-  const assignee = task.assignee || 'Não atribuído';
-  const member = getTeamMembers().find(member => member.name === assignee);
-  const memberColor = member?.color || null;
-  const cardBackground = memberColor ? lightenColor(memberColor, 0.72) : '#ffffff';
-  const cardTextColor = getContrastColor(cardBackground);
-  const badgeColor = memberColor || '#6c757d';
-  const priority = Number(task.priority) || 0;
+  const members = Array.isArray(state.teamMembers[state.currentUser]) ? state.teamMembers[state.currentUser] : [];
+  const member = members.find(m => m.name === task.assignee);
+  const color = member ? member.color : 'var(--border-light)';
   return `
-    <div class="card task-card mb-3 p-3 shadow-sm" draggable="true" data-task-id="${task.id}" style="background-color:${cardBackground}; color:${cardTextColor}; border-color:${badgeColor};">
+    <div class="card task-card shadow-sm p-3" draggable="true" data-task-id="${task.id}" style="border-left: 4px solid ${color}">
       <div class="d-flex justify-content-between align-items-start mb-2">
-        <div class="d-flex flex-column">
-          <strong>${escapeHtml(task.title)}</strong>
-          <div class="d-flex gap-2 mt-2 align-items-center">
-            <span class="badge badge-clickable p-2" style="background-color:${badgeColor};color:#fff;font-size:11px;font-weight:500;" data-action="assignee" data-id="${task.id}">👤 ${escapeHtml(assignee)}</span>
-            <span class="badge badge-clickable p-2" style="background-color:#fde047;color:#000;font-size:11px;font-weight:700;border:1px solid #ccc;" data-action="priority" data-id="${task.id}">${priority}</span>
-          </div>
-        </div>
+        <h6 class="mb-0 fw-bold">${escapeHtml(task.title)}</h6>
       </div>
-      <p class="mb-2 small">${escapeHtml(task.description || 'Sem descrição')}</p>
-      <div class="d-flex justify-content-between align-items-center mt-3">
-        <button class="btn btn-sm btn-outline-primary" data-edit-id="${task.id}">Editar</button>
-        <button class="btn btn-sm btn-outline-danger" data-delete-id="${task.id}">Excluir</button>
+      <p class="text-muted small mb-3">${escapeHtml(task.description || '...')}</p>
+      <div class="d-flex gap-2 mb-3">
+        <span class="badge badge-clickable" style="background:${color}; color:#fff;" onclick="showSelection(this, '${task.id}', 'assignee')">
+          👤 ${task.assignee}
+        </span>
+        <span class="badge badge-clickable badge-priority" onclick="showSelection(this, '${task.id}', 'priority')">
+          🔥 ${task.priority}
+        </span>
+      </div>
+      <div class="d-flex justify-content-end gap-2">
+        <button class="btn btn-light btn-sm" onclick="openEditModal('${task.id}')">✏️</button>
+        <button class="btn btn-light btn-sm text-danger" onclick="deleteTask('${task.id}')">🗑️</button>
       </div>
     </div>`;
 }
 
-function escapeHtml(value) {
-  return String(value).replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[tag]));
-}
+function escapeHtml(str) { return str.replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m])); }
+function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
 
-function hexToRgb(hex) {
-  const normalized = hex.replace('#', '');
-  const value = normalized.length === 3
-    ? normalized.split('').map(ch => ch + ch).join('')
-    : normalized;
-  return {
-    r: parseInt(value.slice(0, 2), 16),
-    g: parseInt(value.slice(2, 4), 16),
-    b: parseInt(value.slice(4, 6), 16)
-  };
-}
+window.deleteMember = function(name) {
+  const members = Array.isArray(state.teamMembers[state.currentUser]) ? state.teamMembers[state.currentUser] : [];
+  state.teamMembers[state.currentUser] = members.filter(m => m.name !== name);
+  saveState();
+  renderBoard();
+};
 
-function rgbToHex({ r, g, b }) {
-  const toHex = channel => channel.toString(16).padStart(2, '0');
-  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
-}
-
-function lightenColor(hex, amount = 0.7) {
-  const { r, g, b } = hexToRgb(hex);
-  return rgbToHex({
-    r: Math.round(r + (255 - r) * amount),
-    g: Math.round(g + (255 - g) * amount),
-    b: Math.round(b + (255 - b) * amount)
-  });
-}
-
-function getContrastColor(hex) {
-  const { r, g, b } = hexToRgb(hex);
-  const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-  return brightness > 160 ? '#000000' : '#ffffff';
-}
-
-function getColumnContainer(column) {
-  const columnIdMap = {
-    inprogress: 'InProgress'
-  };
-  return document.getElementById('column' + (columnIdMap[column] || capitalize(column)));
-}
+window.deleteTask = function(id) {
+  state.tasks = state.tasks.filter(t => t.id !== id);
+  saveState();
+  renderBoard();
+};
 
 function enableDragAndDrop() {
   document.querySelectorAll('.task-card').forEach(card => {
-    card.addEventListener('dragstart', event => {
-      event.dataTransfer.setData('text/plain', card.dataset.taskId);
-      card.classList.add('dragging');
-    });
+    card.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', card.dataset.taskId); card.classList.add('dragging'); });
     card.addEventListener('dragend', () => card.classList.remove('dragging'));
   });
 
   document.querySelectorAll('.task-list').forEach(list => {
-    list.addEventListener('dragover', event => { event.preventDefault(); list.classList.add('drag-over'); });
+    list.addEventListener('dragover', e => { e.preventDefault(); list.classList.add('drag-over'); });
     list.addEventListener('dragleave', () => list.classList.remove('drag-over'));
-    list.addEventListener('drop', event => {
-      event.preventDefault();
+    list.addEventListener('drop', e => {
+      e.preventDefault();
       list.classList.remove('drag-over');
-      const taskId = event.dataTransfer.getData('text/plain');
-      if (taskId) moveTask(taskId, list.dataset.column);
+      const id = e.dataTransfer.getData('text/plain');
+      const task = state.tasks.find(t => t.id === id);
+      if (task) { task.column = list.dataset.column; saveState(); renderBoard(); }
     });
   });
-
-  document.querySelectorAll('[data-edit-id]').forEach(button => button.addEventListener('click', () => openEditModal(button.dataset.editId)));
-  document.querySelectorAll('[data-delete-id]').forEach(button => button.addEventListener('click', () => deleteTask(button.dataset.deleteId)));
-  document.querySelectorAll('[data-action]').forEach(button => button.addEventListener('click', event => handleQuickAction(event.currentTarget.dataset.action, event.currentTarget.dataset.id)));
 }
 
-function deleteMember(name) {
-  state.teamMembers[state.currentUser] = getTeamMembers().filter(member => member.name !== name);
-  saveState();
-  renderBoard();
-  showFlash('Membro removido.', 'info');
-}
-
-function deleteTask(taskId) {
-  state.tasks = state.tasks.filter(task => task.id !== taskId);
-  saveState();
-  renderBoard();
-  showFlash('Tarefa excluída com sucesso.', 'success');
-}
-
-function moveTask(taskId, targetColumn) {
-  const task = state.tasks.find(task => task.id === taskId && task.owner === state.currentUser);
-  if (!task) return;
-  task.column = targetColumn;
-  saveState();
-  renderBoard();
-  showFlash('Tarefa movida com sucesso.', 'success');
-}
-
-function handleQuickAction(action, taskId) {
-  if (action === 'assignee') showSelection(taskId, 'assignee');
-  if (action === 'priority') showSelection(taskId, 'priority');
-}
-
-function showSelection(taskId, field) {
+window.showSelection = function(el, taskId, field) {
   const popup = document.getElementById('selectionPopup');
+  const task = state.tasks.find(t => t.id === taskId);
+  if (!task) return;
+
   popup.innerHTML = '';
-  const task = state.tasks.find(task => task.id === taskId && task.owner === state.currentUser);
-  if (!task) return;
+  const options = field === 'assignee' 
+    ? [{label: 'Não atribuído', value: 'Não atribuído'}, ...(state.teamMembers[state.currentUser] || []).map(m => ({label: m.name, value: m.name}))]
+    : fibonacci.map(f => ({label: String(f), value: String(f)}));
 
-  const members = getTeamMembers();
-  const options = field === 'assignee'
-    ? [{ label: 'Não atribuído', value: '' }, ...members.map(member => ({ label: member.name, value: member.name, color: member.color }))]
-    : Array.from(new Set(fibonacci)).map(value => ({ label: String(value), value: String(value) }));
-
-  options.forEach(option => {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'd-flex align-items-center';
-    button.innerHTML = option.color
-      ? `<span style="width: 14px; height: 14px; border-radius: 4px; background:${option.color}; display:inline-block;"></span><span class="option-label">${escapeHtml(option.label)}</span>`
-      : `<span class="option-label">${escapeHtml(option.label)}</span>`;
-    button.addEventListener('click', () => {
-      popup.classList.remove('visible');
-      if (field === 'assignee') task.assignee = option.value || 'Não atribuído';
-      else task.priority = option.value;
-      saveState();
-      renderBoard();
-    });
-    popup.appendChild(button);
+  options.forEach(opt => {
+    const btn = document.createElement('button');
+    btn.textContent = opt.label;
+    btn.onclick = (e) => { 
+      e.stopPropagation();
+      task[field] = opt.value; 
+      saveState(); 
+      renderBoard(); 
+      toggleSelectionPopup(false); 
+    };
+    popup.appendChild(btn);
   });
 
-  const card = document.querySelector(`[data-task-id="${taskId}"] .badge-clickable[data-action="${field}"]`);
-  if (!card) return;
-  const rect = card.getBoundingClientRect();
+  const rect = el.getBoundingClientRect();
   popup.style.left = `${rect.left + window.scrollX}px`;
-  popup.style.top = `${rect.bottom + window.scrollY + 8}px`;
+  popup.style.top = `${rect.bottom + window.scrollY + 5}px`;
   popup.classList.add('visible');
-}
+};
 
-function toggleSelectionPopup(show) {
-  const popup = document.getElementById('selectionPopup');
-  popup.classList.toggle('visible', show);
-}
+function toggleSelectionPopup(show) { document.getElementById('selectionPopup').classList.toggle('visible', show); }
 
-function openEditModal(taskId) {
-  const task = state.tasks.find(task => task.id === taskId && task.owner === state.currentUser);
+window.openEditModal = function(id) {
+  const task = state.tasks.find(t => t.id === id);
   if (!task) return;
   document.getElementById('editTaskId').value = task.id;
   document.getElementById('editTaskTitle').value = task.title;
   document.getElementById('editTaskDescription').value = task.description;
   document.getElementById('editTaskPriority').value = task.priority;
-  document.getElementById('editTaskAssignee').innerHTML = `<option value="">Não atribuído</option>${getTeamMembers().map(member => `<option value="${member.name}">${member.name}</option>`).join('')}`;
-  document.getElementById('editTaskAssignee').value = task.assignee === 'Não atribuído' ? '' : task.assignee;
   document.getElementById('editTaskColumn').value = task.column;
-  document.getElementById('editTaskPriority').dataset.index = Math.max(0, getFibonacciIndex(Number(task.priority), 0));
+  
+  const members = Array.isArray(state.teamMembers[state.currentUser]) ? state.teamMembers[state.currentUser] : [];
+  const assigneeSelect = document.getElementById('editTaskAssignee');
+  assigneeSelect.innerHTML = `<option value="Não atribuído">Não atribuído</option>` + 
+    members.map(m => `<option value="${m.name}">${m.name}</option>`).join('');
+  assigneeSelect.value = task.assignee;
+  
   editModal.show();
-}
+};
 
-function getFibonacciIndex(value, direction) {
-  const unique = fibonacci.filter((v, index) => fibonacci.indexOf(v) === index);
-  const index = unique.indexOf(value);
-  if (index >= 0) return index;
-  if (direction > 0) return unique.length - 1;
-  if (direction < 0) return 0;
-  return 0;
-}
-
-function adjustPriority(direction) {
-  const input = document.getElementById('editTaskPriority');
-  const current = Number(input.value) || 0;
-  const unique = fibonacci.filter((v, index) => fibonacci.indexOf(v) === index);
-  let index = unique.indexOf(current);
-  if (index < 0) index = 0;
-  const next = Math.max(0, Math.min(unique.length - 1, index + direction));
-  input.value = unique[next];
-}
-
-document.getElementById('editTaskForm').addEventListener('submit', event => {
-  event.preventDefault();
-  const taskId = document.getElementById('editTaskId').value;
-  const task = state.tasks.find(task => task.id === taskId && task.owner === state.currentUser);
-  if (!task) return;
-  task.title = document.getElementById('editTaskTitle').value.trim();
-  task.description = document.getElementById('editTaskDescription').value.trim();
-  task.priority = document.getElementById('editTaskPriority').value;
-  const assignee = document.getElementById('editTaskAssignee').value;
-  task.assignee = assignee || 'Não atribuído';
-  task.column = document.getElementById('editTaskColumn').value;
-  saveState();
-  renderBoard();
-  editModal.hide();
-  showFlash('Tarefa atualizada com sucesso.', 'success');
+document.getElementById('editTaskForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const id = document.getElementById('editTaskId').value;
+  const task = state.tasks.find(t => t.id === id);
+  if (task) {
+    task.title = document.getElementById('editTaskTitle').value;
+    task.description = document.getElementById('editTaskDescription').value;
+    task.priority = document.getElementById('editTaskPriority').value;
+    task.column = document.getElementById('editTaskColumn').value;
+    task.assignee = document.getElementById('editTaskAssignee').value;
+    saveState();
+    renderBoard();
+    editModal.hide();
+  }
 });
 
-function capitalize(value) { return value.charAt(0).toUpperCase() + value.slice(1); }
+function adjustPriority(dir) {
+  const input = document.getElementById('editTaskPriority');
+  const current = Number(input.value);
+  const idx = fibonacci.indexOf(current);
+  const next = Math.max(0, Math.min(fibonacci.length - 1, idx + dir));
+  input.value = fibonacci[next];
+}
