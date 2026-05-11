@@ -36,64 +36,54 @@ python -m http.server 8000
 
 Em seguida, acesse `http://localhost:8000`.
 
+## Segurança
+
+### Medidas implementadas
+- **Sanitização XSS**: Todos os dados do usuário são sanitizados antes de serem inseridos no DOM
+- **Validação de entrada**: Validação rigorosa de usernames, emails, senhas e outros campos
+- **Proteção contra prototype pollution**: Sanitização de objetos JSON carregados
+- **Limitação de tamanho**: Restrições de tamanho para prevenir ataques de denial of service
+- **Sessão com timeout**: Sessões expiram após 24 horas de inatividade
+- **Sem senhas padrão**: Não há credenciais padrão no código
+
+### Recomendações
+- Use HTTPS em produção
+- Mantenha o navegador atualizado
+- Não compartilhe dados sensíveis via localStorage em ambientes compartilhados
+- Considere usar um backend seguro para produção
+
+### Vulnerabilidades corrigidas
+- XSS em mensagens de flash
+- XSS em nomes de membros da equipe
+- XSS em opções de edição de tarefas
+- Prototype pollution no carregamento de estado
+- Falta de validação de entrada
+- Sessões infinitas
+
 ## Credenciais iniciais
 
-- Usuário: `admin`
-- Senha: `123456`
+Como não há mais usuário padrão, você deve se cadastrar primeiro.
 
 ## Observações
 
-- A versão atual é uma aplicação web estática que roda no navegador.
-- Os dados do quadro são armazenados apenas no navegador atual via `localStorage`.
-- Um arquivo de credenciais criptografado pode ser usado para armazenar usuário e senha sem um banco de dados.
+- A versão estática não depende de Python ou backend.
+- Os dados são armazenados apenas no navegador atual.
+- O backend Python/Flask existente permanece no repositório como versão antiga.
 
-## Armazenamento seguro de credenciais
+## Estrutura do projeto
 
-O projeto agora inclui um sistema leve de credenciais criptografadas em `data/credentials.enc`.
-A chave secreta não deve ser armazenada no repositório; use a variável de ambiente `AUTH_SECRET`.
-
-Para iniciar o arquivo de credenciais:
-
-```bash
-copy .env.example .env
-setx AUTH_SECRET "seu_segredo_forte_aqui"
-python init_credentials.py
 ```
-
-O arquivo criptografado será criado em `data/credentials.enc`.
-
-Usuário padrão: `admin` / `123456`
-
-## Estrutura atual do projeto
-
-- `docs/index.html`
-- `docs/app.js`
-- `docs/style.css`
-- `auth_storage.py`
-- `init_credentials.py`
-- `data/credentials.enc`
-- `.env.example`
-- `README.md`
-- `package.json`
-- `.gitignore`
-
-## Como testar localmente
-
-A forma mais simples é abrir `docs/index.html` no navegador ou rodar um servidor local na pasta `docs`:
-
-```bash
-cd docs
-python -m http.server 8000
+ScrumWay/
+├── docs/
+│   ├── index.html
+│   ├── style.css
+│   └── app.js
+├── app.py
+├── main.py
+├── requirements.txt
+├── README.md
+├── templates/
+├── components/
+├── data/
+└── ...
 ```
-
-Em seguida, acesse `http://localhost:8000`.
-
-## Verificação de estrutura
-
-No diretório raiz do projeto, execute:
-
-```bash
-npm test
-```
-
-Isso valida se os arquivos principais estão presentes em `docs/`.

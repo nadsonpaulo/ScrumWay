@@ -4,15 +4,13 @@ const fibonacci = [0,1,1,2,3,5,8,13,21,34,55,89,144,233,377];
 const defaultState = {
   currentUser: null,
   recoveryUser: null,
-  users: {
-    admin: { email: 'admin@example.com', password: '123456' }
-  },
-  notes: { admin: '' },
-  productVision: { admin: '' },
-  dod: { admin: '' },
-  teamMembers: { admin: [] },
+  users: {},
+  notes: {},
+  teamMembers: {},
   tasks: []
 };
+
+const SESSION_TIMEOUT = 24 * 60 * 60 * 1000; // 24 horas em milissegundos
 
 const state = loadState();
 const elements = {
@@ -26,8 +24,6 @@ const elements = {
   boardUsername: document.getElementById('boardUsername'),
   membersList: document.getElementById('membersList'),
   notesText: document.getElementById('notesText'),
-  productVisionText: document.getElementById('productVisionText'),
-  dodText: document.getElementById('dodText'),
   counts: {
     stories: document.getElementById('countStories'),
     todo: document.getElementById('countTodo'),
@@ -41,27 +37,57 @@ const editModal = new bootstrap.Modal(document.getElementById('editTaskModal'));
 init();
 
 function loadState() {
-  const raw = localStorage.getItem(storageKey);
-  const data = raw ? JSON.parse(raw) : null;
-  if (data && typeof data === 'object') {
+  try {
+    const raw = localStorage.getItem(storageKey);
+    if (!raw) {
+      localStorage.setItem(storageKey, JSON.stringify(defaultState));
+      return JSON.parse(JSON.stringify(defaultState));
+    }
+
+    const data = JSON.parse(raw);
+    if (!data || typeof data !== 'object') {
+      localStorage.setItem(storageKey, JSON.stringify(defaultState));
+      return JSON.parse(JSON.stringify(defaultState));
+    }
+
+    // Sanitize loaded data
+    const sanitizedData = sanitizeObject(data);
+
     return {
       ...defaultState,
-      ...data,
-      users: { ...defaultState.users, ...(data.users || {}) },
-      notes: { ...defaultState.notes, ...(data.notes || {}) },
-      productVision: { ...defaultState.productVision, ...(data.productVision || {}) },
-      dod: { ...defaultState.dod, ...(data.dod || {}) },
-      teamMembers: { ...defaultState.teamMembers, ...(data.teamMembers || {}) },
-      tasks: Array.isArray(data.tasks) ? data.tasks : []
+      ...sanitizedData,
+      users: { ...defaultState.users, ...(sanitizedData.users || {}) },
+      notes: { ...defaultState.notes, ...(sanitizedData.notes || {}) },
+      teamMembers: { ...defaultState.teamMembers, ...(sanitizedData.teamMembers || {}) },
+      tasks: Array.isArray(sanitizedData.tasks) ? sanitizedData.tasks : []
     };
+  } catch (error) {
+    console.warn('Erro ao carregar estado, usando estado padrão:', error);
+    localStorage.setItem(storageKey, JSON.stringify(defaultState));
+    return JSON.parse(JSON.stringify(defaultState));
   }
-  localStorage.setItem(storageKey, JSON.stringify(defaultState));
-  return JSON.parse(JSON.stringify(defaultState));
 }
 
-function saveState() { localStorage.setItem(storageKey, JSON.stringify(state)); }
+function saveState() {
+  const sanitizedState = sanitizeObject(state);
+  localStorage.setItem(storageKey, JSON.stringify(sanitizedState));
+}
+
+function checkSessionExpiry() {
+  if (state.currentUser && state.lastLogin) {
+    const now = Date.now();
+    if (now - state.lastLogin > SESSION_TIMEOUT) {
+      logout();
+      showFlash('Sessão expirada. Faça login novamente.', 'warning');
+      return false;
+    }
+  }
+  return true;
+}
 
 function init() {
+  checkSessionExpiry();
+  setInterval(checkSessionExpiry, 60000); // Verificar a cada minuto
   document.getElementById('loginForm').addEventListener('submit', handleLogin);
   document.getElementById('registerForm').addEventListener('submit', handleRegister);
   document.getElementById('forgotForm').addEventListener('submit', handleForgot);
@@ -69,8 +95,6 @@ function init() {
   document.getElementById('createTaskForm').addEventListener('submit', handleCreateTask);
   document.getElementById('addMemberForm').addEventListener('submit', handleAddMember);
   document.getElementById('notesForm').addEventListener('submit', handleSaveNotes);
-  document.getElementById('productVisionForm').addEventListener('submit', handleSaveProductVision);
-  document.getElementById('dodForm').addEventListener('submit', handleSaveDod);
   document.getElementById('backToLoginFromRegister').addEventListener('click', () => showView('login'));
   document.getElementById('backToLoginFromForgot').addEventListener('click', () => showView('login'));
   document.getElementById('backToLoginFromReset').addEventListener('click', () => showView('login'));
@@ -82,39 +106,7 @@ function init() {
     console.log('Usuários:', Object.keys(state.users));
     console.log('Usuário admin:', state.users.admin);
     console.log('localStorage:', localStorage.getItem(storageKey));
-
-    // Abrir ferramentas de desenvolvedor automaticamente
-    if (window.devtools && window.devtools.open) {
-      window.devtools.open();
-    } else {
-      // Fallback para navegadores que suportam
-      try {
-        // Chrome, Edge, Opera
-        if (window.chrome && window.chrome.devtools) {
-          window.chrome.devtools.open();
-        } else {
-          // Firefox
-          if (window.firefox && window.firefox.devtools) {
-            window.firefox.devtools.open();
-          } else {
-            // Safari
-            if (window.safari && window.safari.devtools) {
-              window.safari.devtools.open();
-            } else {
-              // Método genérico - tentar abrir console
-              console.clear();
-              console.log('🔧 Ferramentas de desenvolvedor abertas!');
-              console.log('📊 Dados de debug acima foram impressos.');
-              // Forçar abertura do console em alguns navegadores
-              debugger;
-            }
-          }
-        }
-      } catch (e) {
-        console.log('❌ Não foi possível abrir automaticamente as ferramentas de desenvolvedor.');
-        console.log('📋 Pressione F12 ou clique com o botão direito > Inspecionar para abrir manualmente.');
-      }
-    }
+    alert('Verifique o console do navegador (F12) para informações de debug');
   });
   document.getElementById('logoutBtn').addEventListener('click', logout);
   document.getElementById('decrementPriority').addEventListener('click', () => adjustPriority(-1));
@@ -143,11 +135,17 @@ function handleLogin(event) {
   event.preventDefault();
   const username = document.getElementById('loginUsername').value.trim();
   const password = document.getElementById('loginPassword').value;
-  if (!username || !password) return showFlash('Preencha usuário e senha.', 'danger');
+
+  if (!validateInput(username, 'username', 50) || !validateInput(password, 'password', 100)) {
+    return showFlash('Credenciais inválidas.', 'danger');
+  }
+
   const user = state.users[username];
   if (!user) return showFlash('Usuário não encontrado.', 'danger');
   if (user.password !== password) return showFlash('Senha incorreta.', 'danger');
+
   state.currentUser = username;
+  state.lastLogin = Date.now(); // Track login time
   saveState();
   showFlash('Login efetuado com sucesso!', 'success');
   resetForms();
@@ -160,14 +158,30 @@ function handleRegister(event) {
   const email = document.getElementById('registerEmail').value.trim().toLowerCase();
   const password = document.getElementById('registerPassword').value;
   const confirm = document.getElementById('registerConfirmPassword').value;
-  if (!username || !email || !password || !confirm) return showFlash('Preencha todos os campos.', 'danger');
-  if (password !== confirm) return showFlash('As senhas devem ser iguais.', 'danger');
-  if (state.users[username]) return showFlash('Esse usuário já existe.', 'danger');
-  if (Object.values(state.users).some(u => u.email === email)) return showFlash('Esse email já está cadastrado.', 'danger');
+
+  // Validações rigorosas
+  if (!validateInput(username, 'username', 30)) {
+    return showFlash('Nome de usuário deve ter 3-30 caracteres (letras, números, _ ou -).', 'danger');
+  }
+  if (!validateInput(email, 'email')) {
+    return showFlash('Email inválido.', 'danger');
+  }
+  if (!validateInput(password, 'password', 100)) {
+    return showFlash('Senha deve ter pelo menos 6 caracteres.', 'danger');
+  }
+  if (password !== confirm) {
+    return showFlash('As senhas devem ser iguais.', 'danger');
+  }
+
+  if (state.users[username]) {
+    return showFlash('Esse usuário já existe.', 'danger');
+  }
+  if (Object.values(state.users).some(u => u.email === email)) {
+    return showFlash('Esse email já está cadastrado.', 'danger');
+  }
+
   state.users[username] = { email, password };
   state.notes[username] = '';
-  state.productVision[username] = '';
-  state.dod[username] = '';
   state.teamMembers[username] = [];
   saveState();
   showFlash('Cadastro concluído com sucesso! Faça login.', 'success');
@@ -202,8 +216,16 @@ function handleReset(event) {
 
 function handleCreateTask(event) {
   event.preventDefault();
-  const title = document.getElementById('newTaskTitle').value.trim() || 'Nova Tarefa';
+  const title = document.getElementById('newTaskTitle').value.trim();
   const description = document.getElementById('newTaskDescription').value.trim();
+
+  if (!validateInput(title, 'text', 200)) {
+    return showFlash('Título deve ter 1-200 caracteres.', 'danger');
+  }
+  if (description && !validateInput(description, 'text', 1000)) {
+    return showFlash('Descrição deve ter no máximo 1000 caracteres.', 'danger');
+  }
+
   state.tasks.push({
     id: crypto.randomUUID(),
     owner: state.currentUser,
@@ -223,9 +245,16 @@ function handleCreateTask(event) {
 function handleAddMember(event) {
   event.preventDefault();
   const name = document.getElementById('newMemberName').value.trim();
-  if (!name) return showFlash('Informe o nome do membro.', 'danger');
+
+  if (!validateInput(name, 'text', 50)) {
+    return showFlash('Nome do membro deve ter 1-50 caracteres.', 'danger');
+  }
+
   const members = state.teamMembers[state.currentUser] || [];
-  if (members.some(member => member.name === name)) return showFlash('Esse membro já está cadastrado.', 'danger');
+  if (members.some(member => member.name === name)) {
+    return showFlash('Esse membro já está cadastrado.', 'danger');
+  }
+
   const colors = ['#f97316','#0ea5e9','#9333ea','#22c55e','#e11d48','#facc15','#14b8f6','#14b8a6','#8b5cf6','#fb7185','#38bdf8'];
   const available = colors.filter(color => !members.some(member => member.color === color));
   members.push({ name, color: available[0] || colors[0] });
@@ -243,20 +272,6 @@ function handleSaveNotes(event) {
   showFlash('Observações salvas.', 'success');
 }
 
-function handleSaveProductVision(event) {
-  event.preventDefault();
-  state.productVision[state.currentUser] = elements.productVisionText.value.trim();
-  saveState();
-  showFlash('Visão do produto salva.', 'success');
-}
-
-function handleSaveDod(event) {
-  event.preventDefault();
-  state.dod[state.currentUser] = elements.dodText.value.trim();
-  saveState();
-  showFlash('Definition of Done salva.', 'success');
-}
-
 function logout() {
   state.currentUser = null;
   saveState();
@@ -271,7 +286,9 @@ function showView(view) {
 }
 
 function showFlash(message, type = 'info') {
-  elements.flashContainer.innerHTML = `<div class="alert alert-${type === 'danger' ? 'danger' : type === 'success' ? 'success' : 'info'} flash" role="alert">${message}</div>`;
+  const safeMessage = escapeHtml(message);
+  const safeType = ['danger', 'success', 'warning', 'info'].includes(type) ? type : 'info';
+  elements.flashContainer.innerHTML = `<div class="alert alert-${safeType} flash" role="alert">${safeMessage}</div>`;
 }
 
 function clearFlash() { elements.flashContainer.innerHTML = ''; }
@@ -286,12 +303,10 @@ function renderBoard() {
   if (!state.currentUser) return;
   elements.boardUsername.textContent = state.currentUser;
   elements.notesText.value = state.notes[state.currentUser] || '';
-  elements.productVisionText.value = state.productVision[state.currentUser] || '';
-  elements.dodText.value = state.dod[state.currentUser] || '';
 
   const members = getTeamMembers();
   elements.membersList.innerHTML = members.length
-    ? members.map(member => `<span class="team-member-badge" style="background:${member.color};">${member.name}<button class="btn-close btn-close-white ms-2" type="button" data-member="${member.name}" aria-label="Remover"></button></span>`).join('')
+    ? members.map(member => `<span class="team-member-badge" style="background:${escapeHtml(member.color)};">${escapeHtml(member.name)}<button class="btn-close btn-close-white ms-2" type="button" data-member="${escapeHtml(member.name)}" aria-label="Remover"></button></span>`).join('')
     : '<p class="text-muted small">Ainda não há membros cadastrados.</p>';
   elements.membersList.querySelectorAll('.btn-close').forEach(button => button.addEventListener('click', () => deleteMember(button.dataset.member)));
 
@@ -312,18 +327,15 @@ function renderBoard() {
 function taskCard(task) {
   const assignee = task.assignee || 'Não atribuído';
   const member = getTeamMembers().find(member => member.name === assignee);
-  const memberColor = member?.color || null;
-  const cardBackground = memberColor ? lightenColor(memberColor, 0.72) : '#ffffff';
-  const cardTextColor = getContrastColor(cardBackground);
-  const badgeColor = memberColor || '#6c757d';
+  const memberColor = member?.color || '#6c757d';
   const priority = Number(task.priority) || 0;
   return `
-    <div class="card task-card mb-3 p-3 shadow-sm" draggable="true" data-task-id="${task.id}" style="background-color:${cardBackground}; color:${cardTextColor}; border-color:${badgeColor};">
+    <div class="card task-card mb-3 p-3 shadow-sm" draggable="true" data-task-id="${task.id}">
       <div class="d-flex justify-content-between align-items-start mb-2">
         <div class="d-flex flex-column">
           <strong>${escapeHtml(task.title)}</strong>
           <div class="d-flex gap-2 mt-2 align-items-center">
-            <span class="badge badge-clickable p-2" style="background-color:${badgeColor};color:#fff;font-size:11px;font-weight:500;" data-action="assignee" data-id="${task.id}">👤 ${escapeHtml(assignee)}</span>
+            <span class="badge badge-clickable p-2" style="background-color:${memberColor};color:#fff;font-size:11px;font-weight:500;" data-action="assignee" data-id="${task.id}">👤 ${escapeHtml(assignee)}</span>
             <span class="badge badge-clickable p-2" style="background-color:#fde047;color:#000;font-size:11px;font-weight:700;border:1px solid #ccc;" data-action="priority" data-id="${task.id}">${priority}</span>
           </div>
         </div>
@@ -340,36 +352,37 @@ function escapeHtml(value) {
   return String(value).replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[tag]));
 }
 
-function hexToRgb(hex) {
-  const normalized = hex.replace('#', '');
-  const value = normalized.length === 3
-    ? normalized.split('').map(ch => ch + ch).join('')
-    : normalized;
-  return {
-    r: parseInt(value.slice(0, 2), 16),
-    g: parseInt(value.slice(2, 4), 16),
-    b: parseInt(value.slice(4, 6), 16)
-  };
+function validateInput(input, type = 'text', maxLength = 100) {
+  if (!input || typeof input !== 'string') return false;
+
+  const trimmed = input.trim();
+  if (trimmed.length === 0 || trimmed.length > maxLength) return false;
+
+  switch (type) {
+    case 'username':
+      return /^[a-zA-Z0-9_-]{3,}$/.test(trimmed);
+    case 'email':
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed) && trimmed.length <= 254;
+    case 'password':
+      return trimmed.length >= 6;
+    case 'text':
+    default:
+      return trimmed.length > 0;
+  }
 }
 
-function rgbToHex({ r, g, b }) {
-  const toHex = channel => channel.toString(16).padStart(2, '0');
-  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
-}
-
-function lightenColor(hex, amount = 0.7) {
-  const { r, g, b } = hexToRgb(hex);
-  return rgbToHex({
-    r: Math.round(r + (255 - r) * amount),
-    g: Math.round(g + (255 - g) * amount),
-    b: Math.round(b + (255 - b) * amount)
-  });
-}
-
-function getContrastColor(hex) {
-  const { r, g, b } = hexToRgb(hex);
-  const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-  return brightness > 160 ? '#000000' : '#ffffff';
+function sanitizeObject(obj) {
+  const sanitized = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (typeof value === 'string') {
+      sanitized[key] = value.slice(0, 1000); // Limit string length
+    } else if (typeof value === 'object' && value !== null) {
+      sanitized[key] = sanitizeObject(value);
+    } else {
+      sanitized[key] = value;
+    }
+  }
+  return sanitized;
 }
 
 function getColumnContainer(column) {
@@ -480,7 +493,7 @@ function openEditModal(taskId) {
   document.getElementById('editTaskTitle').value = task.title;
   document.getElementById('editTaskDescription').value = task.description;
   document.getElementById('editTaskPriority').value = task.priority;
-  document.getElementById('editTaskAssignee').innerHTML = `<option value="">Não atribuído</option>${getTeamMembers().map(member => `<option value="${member.name}">${member.name}</option>`).join('')}`;
+  document.getElementById('editTaskAssignee').innerHTML = `<option value="">Não atribuído</option>${getTeamMembers().map(member => `<option value="${escapeHtml(member.name)}">${escapeHtml(member.name)}</option>`).join('')}`;
   document.getElementById('editTaskAssignee').value = task.assignee === 'Não atribuído' ? '' : task.assignee;
   document.getElementById('editTaskColumn').value = task.column;
   document.getElementById('editTaskPriority').dataset.index = Math.max(0, getFibonacciIndex(Number(task.priority), 0));
