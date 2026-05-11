@@ -9,6 +9,7 @@ const defaultState = {
   },
   notes: { admin: '' },
   productVision: { admin: '' },
+  dod: { admin: '' },
   teamMembers: { admin: [] },
   tasks: []
 };
@@ -26,6 +27,7 @@ const elements = {
   membersList: document.getElementById('membersList'),
   notesText: document.getElementById('notesText'),
   productVisionText: document.getElementById('productVisionText'),
+  dodText: document.getElementById('dodText'),
   counts: {
     stories: document.getElementById('countStories'),
     todo: document.getElementById('countTodo'),
@@ -48,6 +50,7 @@ function loadState() {
       users: { ...defaultState.users, ...(data.users || {}) },
       notes: { ...defaultState.notes, ...(data.notes || {}) },
       productVision: { ...defaultState.productVision, ...(data.productVision || {}) },
+      dod: { ...defaultState.dod, ...(data.dod || {}) },
       teamMembers: { ...defaultState.teamMembers, ...(data.teamMembers || {}) },
       tasks: Array.isArray(data.tasks) ? data.tasks : []
     };
@@ -67,6 +70,7 @@ function init() {
   document.getElementById('addMemberForm').addEventListener('submit', handleAddMember);
   document.getElementById('notesForm').addEventListener('submit', handleSaveNotes);
   document.getElementById('productVisionForm').addEventListener('submit', handleSaveProductVision);
+  document.getElementById('dodForm').addEventListener('submit', handleSaveDod);
   document.getElementById('backToLoginFromRegister').addEventListener('click', () => showView('login'));
   document.getElementById('backToLoginFromForgot').addEventListener('click', () => showView('login'));
   document.getElementById('backToLoginFromReset').addEventListener('click', () => showView('login'));
@@ -130,6 +134,8 @@ function handleRegister(event) {
   if (Object.values(state.users).some(u => u.email === email)) return showFlash('Esse email já está cadastrado.', 'danger');
   state.users[username] = { email, password };
   state.notes[username] = '';
+  state.productVision[username] = '';
+  state.dod[username] = '';
   state.teamMembers[username] = [];
   saveState();
   showFlash('Cadastro concluído com sucesso! Faça login.', 'success');
@@ -212,6 +218,13 @@ function handleSaveProductVision(event) {
   showFlash('Visão do produto salva.', 'success');
 }
 
+function handleSaveDod(event) {
+  event.preventDefault();
+  state.dod[state.currentUser] = elements.dodText.value.trim();
+  saveState();
+  showFlash('Definition of Done salva.', 'success');
+}
+
 function logout() {
   state.currentUser = null;
   saveState();
@@ -242,6 +255,7 @@ function renderBoard() {
   elements.boardUsername.textContent = state.currentUser;
   elements.notesText.value = state.notes[state.currentUser] || '';
   elements.productVisionText.value = state.productVision[state.currentUser] || '';
+  elements.dodText.value = state.dod[state.currentUser] || '';
 
   const members = getTeamMembers();
   elements.membersList.innerHTML = members.length
