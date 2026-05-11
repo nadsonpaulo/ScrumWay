@@ -254,15 +254,18 @@ function renderBoard() {
 function taskCard(task) {
   const assignee = task.assignee || 'Não atribuído';
   const member = getTeamMembers().find(member => member.name === assignee);
-  const memberColor = member?.color || '#6c757d';
+  const memberColor = member?.color || null;
+  const cardBackground = memberColor ? lightenColor(memberColor, 0.72) : '#ffffff';
+  const cardTextColor = getContrastColor(cardBackground);
+  const badgeColor = memberColor || '#6c757d';
   const priority = Number(task.priority) || 0;
   return `
-    <div class="card task-card mb-3 p-3 shadow-sm" draggable="true" data-task-id="${task.id}">
+    <div class="card task-card mb-3 p-3 shadow-sm" draggable="true" data-task-id="${task.id}" style="background-color:${cardBackground}; color:${cardTextColor}; border-color:${badgeColor};">
       <div class="d-flex justify-content-between align-items-start mb-2">
         <div class="d-flex flex-column">
           <strong>${escapeHtml(task.title)}</strong>
           <div class="d-flex gap-2 mt-2 align-items-center">
-            <span class="badge badge-clickable p-2" style="background-color:${memberColor};color:#fff;font-size:11px;font-weight:500;" data-action="assignee" data-id="${task.id}">👤 ${escapeHtml(assignee)}</span>
+            <span class="badge badge-clickable p-2" style="background-color:${badgeColor};color:#fff;font-size:11px;font-weight:500;" data-action="assignee" data-id="${task.id}">👤 ${escapeHtml(assignee)}</span>
             <span class="badge badge-clickable p-2" style="background-color:#fde047;color:#000;font-size:11px;font-weight:700;border:1px solid #ccc;" data-action="priority" data-id="${task.id}">${priority}</span>
           </div>
         </div>
@@ -277,6 +280,38 @@ function taskCard(task) {
 
 function escapeHtml(value) {
   return String(value).replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[tag]));
+}
+
+function hexToRgb(hex) {
+  const normalized = hex.replace('#', '');
+  const value = normalized.length === 3
+    ? normalized.split('').map(ch => ch + ch).join('')
+    : normalized;
+  return {
+    r: parseInt(value.slice(0, 2), 16),
+    g: parseInt(value.slice(2, 4), 16),
+    b: parseInt(value.slice(4, 6), 16)
+  };
+}
+
+function rgbToHex({ r, g, b }) {
+  const toHex = channel => channel.toString(16).padStart(2, '0');
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
+function lightenColor(hex, amount = 0.7) {
+  const { r, g, b } = hexToRgb(hex);
+  return rgbToHex({
+    r: Math.round(r + (255 - r) * amount),
+    g: Math.round(g + (255 - g) * amount),
+    b: Math.round(b + (255 - b) * amount)
+  });
+}
+
+function getContrastColor(hex) {
+  const { r, g, b } = hexToRgb(hex);
+  const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+  return brightness > 160 ? '#000000' : '#ffffff';
 }
 
 function getColumnContainer(column) {
