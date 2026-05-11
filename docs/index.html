@@ -63,7 +63,8 @@
           </form>
           <div class="mt-3 text-center">
             <button class="btn btn-link p-0" id="showRegister">Cadastrar</button><br>
-            <button class="btn btn-link p-0" id="showForgot">Esqueci minha senha</button>
+            <button class="btn btn-link p-0" id="showForgot">Esqueci minha senha</button><br>
+            <button class="btn btn-link p-0 mt-2" id="debugBtn" style="font-size: 0.8em; color: #666;">Debug</button>
           </div>
         </div>
       </div>
@@ -315,10 +316,29 @@ init();
 
 function loadState() {
   const raw = localStorage.getItem(storageKey);
+  console.log('Dados brutos do localStorage:', raw);
+
   try {
     const data = raw ? JSON.parse(raw) : null;
-    if (data && typeof data === 'object') return { ...defaultState, ...data, users: { ...defaultState.users, ...data.users }, notes: { ...defaultState.notes, ...data.notes }, teamMembers: { ...defaultState.teamMembers, ...data.teamMembers }, tasks: Array.isArray(data.tasks) ? data.tasks : [] };
-  } catch (error) {}
+    console.log('Dados parseados:', data);
+
+    if (data && typeof data === 'object') {
+      const merged = {
+        ...defaultState,
+        ...data,
+        users: { ...defaultState.users, ...(data.users || {}) },
+        notes: { ...defaultState.notes, ...(data.notes || {}) },
+        teamMembers: { ...defaultState.teamMembers, ...(data.teamMembers || {}) },
+        tasks: Array.isArray(data.tasks) ? data.tasks : []
+      };
+      console.log('Estado mesclado:', merged);
+      return merged;
+    }
+  } catch (error) {
+    console.error('Erro ao carregar estado:', error);
+  }
+
+  console.log('Usando estado padrão');
   localStorage.setItem(storageKey, JSON.stringify(defaultState));
   return JSON.parse(JSON.stringify(defaultState));
 }
@@ -326,6 +346,10 @@ function loadState() {
 function saveState() { localStorage.setItem(storageKey, JSON.stringify(state)); }
 
 function init() {
+  console.log('Inicializando aplicação...');
+  console.log('Estado padrão:', defaultState);
+  console.log('Estado carregado:', state);
+
   document.getElementById('loginForm').addEventListener('submit', handleLogin);
   document.getElementById('registerForm').addEventListener('submit', handleRegister);
   document.getElementById('forgotForm').addEventListener('submit', handleForgot);
@@ -338,6 +362,14 @@ function init() {
   document.getElementById('backToLoginFromReset').addEventListener('click', () => showView('login'));
   document.getElementById('showRegister').addEventListener('click', () => showView('register'));
   document.getElementById('showForgot').addEventListener('click', () => showView('forgot'));
+  document.getElementById('debugBtn').addEventListener('click', () => {
+    console.log('=== DEBUG INFO ===');
+    console.log('Estado atual:', state);
+    console.log('Usuários:', Object.keys(state.users));
+    console.log('Usuário admin:', state.users.admin);
+    console.log('localStorage:', localStorage.getItem(storageKey));
+    alert('Verifique o console do navegador (F12) para informações de debug');
+  });
   document.getElementById('logoutBtn').addEventListener('click', logout);
   document.getElementById('decrementPriority').addEventListener('click', () => adjustPriority(-1));
   document.getElementById('incrementPriority').addEventListener('click', () => adjustPriority(1));
@@ -345,7 +377,15 @@ function init() {
   document.getElementById('selectionPopup').addEventListener('click', (event) => event.stopPropagation());
   document.addEventListener('click', () => toggleSelectionPopup(false));
   setTheme();
-  if (state.currentUser) showView('board'); else showView('login');
+
+  console.log('Usuário atual:', state.currentUser);
+  if (state.currentUser) {
+    console.log('Mostrando board');
+    showView('board');
+  } else {
+    console.log('Mostrando login');
+    showView('login');
+  }
 }
 
 function setTheme() {
@@ -364,10 +404,32 @@ function handleLogin(event) {
   event.preventDefault();
   const username = document.getElementById('loginUsername').value.trim();
   const password = document.getElementById('loginPassword').value;
-  if (!username || !password) return showFlash('Preencha usuário e senha.', 'danger');
+
+  console.log('Tentando login:', username, password ? '[SENHA]' : 'sem senha');
+
+  if (!username || !password) {
+    console.log('Campos vazios');
+    return showFlash('Preencha usuário e senha.', 'danger');
+  }
+
   const user = state.users[username];
-  if (!user || user.password !== password) return showFlash('Usuário ou senha incorretos.', 'danger');
-  state.currentUser = username; saveState();
+  console.log('Usuário encontrado:', user ? 'sim' : 'não');
+
+  if (!user) {
+    console.log('Usuário não existe');
+    return showFlash('Usuário não encontrado.', 'danger');
+  }
+
+  console.log('Comparando senhas:', user.password, '===', password, '?', user.password === password);
+
+  if (user.password !== password) {
+    console.log('Senha incorreta');
+    return showFlash('Senha incorreta.', 'danger');
+  }
+
+  console.log('Login bem-sucedido');
+  state.currentUser = username;
+  saveState();
   showFlash('Login efetuado com sucesso!', 'success');
   resetForms();
   showView('board');
