@@ -82,7 +82,6 @@ function init() {
   document.getElementById('backToLoginFromRegister').addEventListener('click', () => showView('login'));
   document.getElementById('showRegister').addEventListener('click', () => showView('register'));
   
-  // Backup features
   document.getElementById('exportDataBtn').addEventListener('click', exportData);
   document.getElementById('importDataBtn').addEventListener('click', () => document.getElementById('importFile').click());
   document.getElementById('importFile').addEventListener('change', importData);
@@ -114,13 +113,13 @@ function init() {
 function setTheme() {
   const isDark = localStorage.getItem('scrumway_theme') === 'dark';
   document.body.classList.toggle('dark', isDark);
-  elements.btnTheme.textContent = isDark ? 'Tema claro' : 'Tema escuro';
+  if (elements.btnTheme) elements.btnTheme.textContent = isDark ? 'Tema claro' : 'Tema escuro';
 }
 
 function toggleTheme() {
   const isDark = document.body.classList.toggle('dark');
   localStorage.setItem('scrumway_theme', isDark ? 'dark' : 'light');
-  elements.btnTheme.textContent = isDark ? 'Tema claro' : 'Tema escuro';
+  if (elements.btnTheme) elements.btnTheme.textContent = isDark ? 'Tema claro' : 'Tema escuro';
 }
 
 function handleLogin(event) {
@@ -241,12 +240,15 @@ function showView(view) {
   document.querySelectorAll('.view-section').forEach(sec => sec.classList.add('hidden'));
   const section = document.getElementById(`${view}Section`);
   if (section) section.classList.remove('hidden');
-  
-  elements.authButtons.classList.toggle('hidden', view !== 'board');
+
+  if (elements.authButtons) {
+    elements.authButtons.classList.toggle('hidden', view !== 'board');
+  }
   if (view === 'board') renderBoard();
 }
 
 function showFlash(message, type = 'info') {
+  if (!elements.flashContainer) return;
   elements.flashContainer.innerHTML = `<div class="alert alert-${type} alert-dismissible fade show shadow-sm" role="alert">
     ${message}
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
@@ -354,9 +356,10 @@ window.showSelection = function(el, taskId, field) {
   if (!task) return;
 
   popup.innerHTML = '';
-  const options = field === 'assignee' 
-    ? [{label: 'Não atribuído', value: 'Não atribuído'}, ...(state.teamMembers[state.currentUser] || []).map(m => ({label: m.name, value: m.name}))]
-    : fibonacci.map(f => ({label: String(f), value: String(f)}));
+  const members = Array.isArray(state.teamMembers[state.currentUser]) ? state.teamMembers[state.currentUser] : [];
+  const options = field === 'assignee'
+    ? [{ label: 'Não atribuído', value: 'Não atribuído' }, ...members.map(m => ({ label: m.name, value: m.name }))]
+    : [...new Set(fibonacci)].map(f => ({ label: String(f), value: String(f) }));
 
   options.forEach(opt => {
     const btn = document.createElement('button');
@@ -394,7 +397,7 @@ window.openEditModal = function(id) {
     members.map(m => `<option value="${m.name}">${m.name}</option>`).join('');
   assigneeSelect.value = task.assignee;
   
-  editModal.show();
+  if (editModal) editModal.show();
 };
 
 document.getElementById('editTaskForm').addEventListener('submit', e => {
@@ -409,14 +412,15 @@ document.getElementById('editTaskForm').addEventListener('submit', e => {
     task.assignee = document.getElementById('editTaskAssignee').value;
     saveState();
     renderBoard();
-    editModal.hide();
+    if (editModal) editModal.hide();
   }
 });
 
 function adjustPriority(dir) {
   const input = document.getElementById('editTaskPriority');
   const current = Number(input.value);
-  const idx = fibonacci.indexOf(current);
-  const next = Math.max(0, Math.min(fibonacci.length - 1, idx + dir));
-  input.value = fibonacci[next];
+  const uniqueFib = [...new Set(fibonacci)];
+  const idx = uniqueFib.indexOf(current);
+  const next = Math.max(0, Math.min(uniqueFib.length - 1, (idx < 0 ? 0 : idx) + dir));
+  input.value = uniqueFib[next];
 }
