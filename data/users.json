@@ -1,0 +1,6 @@
+{
+  "admin": {
+    "email": "admin@example.com",
+    "password": "pbkdf2_sha256$120000$fe10550175ff033069c6f1ad14c64978$aaadef34015f2fee28460550e15cf8c0289cac48974d1c263c04c3229da71157"
+  }
+}
