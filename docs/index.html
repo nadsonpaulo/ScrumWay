@@ -527,6 +527,13 @@ function showFlash(message, type = 'info') {
   elements.flashContainer.innerHTML = `<div class="alert alert-${type === 'danger' ? 'danger' : type === 'success' ? 'success' : 'info'} flash" role="alert">${message}</div>`;
 }
 
+function getColumnContainer(column) {
+  const columnIdMap = {
+    inprogress: 'InProgress'
+  };
+  return document.getElementById('column' + (columnIdMap[column] || capitalize(column)));
+}
+
 function clearFlash() { elements.flashContainer.innerHTML = ''; }
 
 function resetForms() {
@@ -551,10 +558,14 @@ function renderBoard() {
 
   const tasks = getCurrentTasks();
   columns.forEach(column => {
-    const container = document.getElementById('column' + capitalize(column));
+    const container = getColumnContainer(column);
     const filtered = tasks.filter(task => task.column === column);
-    container.innerHTML = filtered.map(taskCard).join('') || '<div class="text-muted small">Nenhuma tarefa.</div>';
-    elements.counts[column].textContent = filtered.length;
+    if (container) {
+      container.innerHTML = filtered.map(taskCard).join('') || '<div class="text-muted small">Nenhuma tarefa.</div>';
+    }
+    if (elements.counts[column]) {
+      elements.counts[column].textContent = filtered.length;
+    }
   });
   enableDragAndDrop();
 }
@@ -583,7 +594,7 @@ function taskCard(task) {
     </div>`;
 }
 
-function escapeHtml(value) { return String(value).replace(/[&<>'"]/g, tag => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'":"&#39;'}[tag])); }
+function escapeHtml(value) { return String(value).replace(/[&<>'"]/g, tag => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[tag])); }
 
 function enableDragAndDrop() {
   document.querySelectorAll('.task-card').forEach(card => {
@@ -605,7 +616,7 @@ function enableDragAndDrop() {
   });
   document.querySelectorAll('[data-edit-id]').forEach(button => button.addEventListener('click', () => openEditModal(button.dataset.editId)));
   document.querySelectorAll('[data-delete-id]').forEach(button => button.addEventListener('click', () => deleteTask(button.dataset.deleteId)));
-  document.querySelectorAll('[data-action]').forEach(button => button.addEventListener('click', event => handleQuickAction(event.target.dataset.action, event.target.dataset.id)));
+  document.querySelectorAll('[data-action]').forEach(button => button.addEventListener('click', event => handleQuickAction(event.currentTarget.dataset.action, event.currentTarget.dataset.id)));
 }
 
 function deleteMember(name) {
@@ -636,7 +647,9 @@ function showSelection(taskId, field) {
   const task = state.tasks.find(task => task.id === taskId && task.owner === state.currentUser);
   if (!task) return;
   const members = getTeamMembers();
-  const options = field === 'assignee' ? [{ label: 'Não atribuído', value: '' }, ...members.map(member => ({ label: member.name, value: member.name, color: member.color }))] : fibonacci.map(value => ({ label: String(value), value: String(value) }));
+  const options = field === 'assignee'
+    ? [{ label: 'Não atribuído', value: '' }, ...members.map(member => ({ label: member.name, value: member.name, color: member.color }))]
+    : Array.from(new Set(fibonacci)).map(value => ({ label: String(value), value: String(value) }));
   options.forEach(option => {
     const button = document.createElement('button');
     button.type = 'button';
@@ -673,16 +686,27 @@ function openEditModal(taskId) {
   document.getElementById('editTaskAssignee').innerHTML = `<option value="">Não atribuído</option>${getTeamMembers().map(member => `<option value="${member.name}">${member.name}</option>`).join('')}`;
   document.getElementById('editTaskAssignee').value = task.assignee === 'Não atribuído' ? '' : task.assignee;
   document.getElementById('editTaskColumn').value = task.column;
-  document.getElementById('editTaskPriority').dataset.index = Math.max(0, fibonacci.indexOf(Number(task.priority))); 
+  document.getElementById('editTaskPriority').dataset.index = Math.max(0, getFibonacciIndex(Number(task.priority), 0));
   editModal.show();
+}
+
+function getFibonacciIndex(value, direction) {
+  const unique = fibonacci.filter((v, index) => fibonacci.indexOf(v) === index);
+  const index = unique.indexOf(value);
+  if (index >= 0) return index;
+  if (direction > 0) return unique.length - 1;
+  if (direction < 0) return 0;
+  return 0;
 }
 
 function adjustPriority(direction) {
   const input = document.getElementById('editTaskPriority');
   const current = Number(input.value) || 0;
-  const index = fibonacci.indexOf(current) >= 0 ? fibonacci.indexOf(current) : 0;
-  const next = Math.max(0, Math.min(fibonacci.length - 1, index + direction));
-  input.value = fibonacci[next];
+  const unique = fibonacci.filter((v, index) => fibonacci.indexOf(v) === index);
+  let index = unique.indexOf(current);
+  if (index < 0) index = 0;
+  const next = Math.max(0, Math.min(unique.length - 1, index + direction));
+  input.value = unique[next];
 }
 
 document.getElementById('editTaskForm').addEventListener('submit', event => {
