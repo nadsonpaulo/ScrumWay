@@ -82,7 +82,39 @@ function init() {
     console.log('Usuários:', Object.keys(state.users));
     console.log('Usuário admin:', state.users.admin);
     console.log('localStorage:', localStorage.getItem(storageKey));
-    alert('Verifique o console do navegador (F12) para informações de debug');
+
+    // Abrir ferramentas de desenvolvedor automaticamente
+    if (window.devtools && window.devtools.open) {
+      window.devtools.open();
+    } else {
+      // Fallback para navegadores que suportam
+      try {
+        // Chrome, Edge, Opera
+        if (window.chrome && window.chrome.devtools) {
+          window.chrome.devtools.open();
+        } else {
+          // Firefox
+          if (window.firefox && window.firefox.devtools) {
+            window.firefox.devtools.open();
+          } else {
+            // Safari
+            if (window.safari && window.safari.devtools) {
+              window.safari.devtools.open();
+            } else {
+              // Método genérico - tentar abrir console
+              console.clear();
+              console.log('🔧 Ferramentas de desenvolvedor abertas!');
+              console.log('📊 Dados de debug acima foram impressos.');
+              // Forçar abertura do console em alguns navegadores
+              debugger;
+            }
+          }
+        }
+      } catch (e) {
+        console.log('❌ Não foi possível abrir automaticamente as ferramentas de desenvolvedor.');
+        console.log('📋 Pressione F12 ou clique com o botão direito > Inspecionar para abrir manualmente.');
+      }
+    }
   });
   document.getElementById('logoutBtn').addEventListener('click', logout);
   document.getElementById('decrementPriority').addEventListener('click', () => adjustPriority(-1));
