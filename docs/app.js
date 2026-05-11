@@ -8,6 +8,7 @@ const defaultState = {
     admin: { email: 'admin@example.com', password: '123456' }
   },
   notes: { admin: '' },
+  productVision: { admin: '' },
   teamMembers: { admin: [] },
   tasks: []
 };
@@ -24,6 +25,7 @@ const elements = {
   boardUsername: document.getElementById('boardUsername'),
   membersList: document.getElementById('membersList'),
   notesText: document.getElementById('notesText'),
+  productVisionText: document.getElementById('productVisionText'),
   counts: {
     stories: document.getElementById('countStories'),
     todo: document.getElementById('countTodo'),
@@ -45,6 +47,7 @@ function loadState() {
       ...data,
       users: { ...defaultState.users, ...(data.users || {}) },
       notes: { ...defaultState.notes, ...(data.notes || {}) },
+      productVision: { ...defaultState.productVision, ...(data.productVision || {}) },
       teamMembers: { ...defaultState.teamMembers, ...(data.teamMembers || {}) },
       tasks: Array.isArray(data.tasks) ? data.tasks : []
     };
@@ -63,6 +66,7 @@ function init() {
   document.getElementById('createTaskForm').addEventListener('submit', handleCreateTask);
   document.getElementById('addMemberForm').addEventListener('submit', handleAddMember);
   document.getElementById('notesForm').addEventListener('submit', handleSaveNotes);
+  document.getElementById('productVisionForm').addEventListener('submit', handleSaveProductVision);
   document.getElementById('backToLoginFromRegister').addEventListener('click', () => showView('login'));
   document.getElementById('backToLoginFromForgot').addEventListener('click', () => showView('login'));
   document.getElementById('backToLoginFromReset').addEventListener('click', () => showView('login'));
@@ -201,6 +205,13 @@ function handleSaveNotes(event) {
   showFlash('Observações salvas.', 'success');
 }
 
+function handleSaveProductVision(event) {
+  event.preventDefault();
+  state.productVision[state.currentUser] = elements.productVisionText.value.trim();
+  saveState();
+  showFlash('Visão do produto salva.', 'success');
+}
+
 function logout() {
   state.currentUser = null;
   saveState();
@@ -230,6 +241,7 @@ function renderBoard() {
   if (!state.currentUser) return;
   elements.boardUsername.textContent = state.currentUser;
   elements.notesText.value = state.notes[state.currentUser] || '';
+  elements.productVisionText.value = state.productVision[state.currentUser] || '';
 
   const members = getTeamMembers();
   elements.membersList.innerHTML = members.length
