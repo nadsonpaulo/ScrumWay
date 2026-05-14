@@ -11,7 +11,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app)
+# Restringe o CORS para ser mais seguro
+CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
 
 # Configurações de Segurança e Banco de Dados
 basedir = os.path.abspath(os.path.dirname(__file__))

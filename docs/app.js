@@ -303,7 +303,18 @@ function renderBoard() {
 function taskCard(task) {
   const member = (state.teamMembers[state.currentUser] || []).find(m => m.name === task.assignee);
   const color = member ? member.color : 'var(--border-light)';
-  return `<div class="card task-card shadow-sm p-3" draggable="true" data-task-id="${task.id}" style="border-left: 4px solid ${color}"><h6 class="fw-bold mb-1">${escapeHtml(task.title)}</h6><p class="text-muted small mb-3">${escapeHtml(task.description || '...')}</p><div class="d-flex gap-2 mb-3"><span class="badge badge-clickable" style="background:${color}; color:#fff;" onclick="showSelection(this, '${task.id}', 'assignee')">👤 ${task.assignee}</span><span class="badge badge-clickable badge-priority" onclick="showSelection(this, '${task.id}', 'priority')">🔥 ${task.priority}</span></div><div class="d-flex justify-content-end gap-2"><button class="btn btn-light btn-sm" onclick="openEditModal('${task.id}')">✏️</button><button class="btn btn-light btn-sm text-danger" onclick="deleteTask('${task.id}')">🗑️</button></div></div>`;
+  return `<div class="card task-card shadow-sm p-3" draggable="true" data-task-id="${task.id}" style="border-left: 4px solid ${color}">
+    <h6 class="fw-bold mb-1">${escapeHtml(task.title)}</h6>
+    <p class="text-muted small mb-3">${escapeHtml(task.description || '...')}</p>
+    <div class="d-flex gap-2 mb-3">
+      <span class="badge badge-clickable" style="background:${color}; color:#fff;" onclick="showSelection(this, '${task.id}', 'assignee')">👤 ${escapeHtml(task.assignee)}</span>
+      <span class="badge badge-clickable badge-priority" onclick="showSelection(this, '${task.id}', 'priority')">🔥 ${escapeHtml(task.priority)}</span>
+    </div>
+    <div class="d-flex justify-content-end gap-2">
+      <button class="btn btn-light btn-sm" onclick="openEditModal('${task.id}')">✏️</button>
+      <button class="btn btn-light btn-sm text-danger" onclick="deleteTask('${task.id}')">🗑️</button>
+    </div>
+  </div>`;
 }
 
 async function handleCreateTask(e) { e.preventDefault(); state.tasks.push({ id: crypto.randomUUID(), owner: state.currentUser, title: document.getElementById('newTaskTitle').value.trim(), description: document.getElementById('newTaskDescription').value.trim(), priority: '0', assignee: 'Não atribuído', column: 'stories', createdAt: new Date().toISOString() }); await saveState(); e.target.reset(); renderBoard(); }
