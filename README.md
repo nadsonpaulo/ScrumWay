@@ -1,91 +1,75 @@
-# ScrumWay - Gestão Ágil
+# ScrumWay - Gestão Ágil Profissional (v2.1)
 
-ScrumWay é uma aplicação de quadro SCRUM moderna, agora com suporte a banco de dados, perfis de acesso (Team, PO, SM, Admin) e segurança robusta via JWT.
+ScrumWay é uma aplicação de quadro SCRUM moderna, segura e escalável, projetada para equipes que buscam simplicidade com robustez.
 
-## 🚀 Novas Funcionalidades (v2.0)
+## 🚀 Funcionalidades Principais
 
-- **Backend Flask**: API robusta para gerenciamento de usuários e autenticação.
-- **Banco de Dados SQLite**: Armazenamento seguro de contas e perfis.
-- **Segurança JWT**: Autenticação via tokens (JSON Web Tokens) com expiração.
-- **Painel Administrativo**: Gestão de usuários, alteração de perfis e redefinição de senhas.
-- **Troca de Senha Obrigatória**: Segurança reforçada para contas com senhas padrão.
-- **Perfis de Acesso**: Suporte a perfis Team, Product Owner (PO) e Scrum Master (SM).
-- **Criptografia Client-side**: Os dados do quadro permanecem privados e criptografados no navegador do usuário.
-
----
-
-## 🛠️ Requisitos
-
-- Python 3.8 ou superior
-- Pip (Gerenciador de pacotes do Python)
-
----
-
-## 📦 Instalação e Configuração
-
-### 1. Clonar o Repositório
-```bash
-git clone https://github.com/nadsonpaulo/ScrumWay.git
-cd ScrumWay
-```
-
-### 2. Instalar Dependências
-```bash
-pip install -r requirements.txt
-```
-
-### 3. Configurar Variáveis de Ambiente
-Crie um arquivo `.env` na raiz do projeto (use o `.env.example` como base):
-```bash
-AUTH_SECRET=seu_segredo_super_forte_aqui
-ADMIN_PASSWORD=admin
-```
-
----
-
-## 🚦 Como Rodar
-
-### Iniciar o Backend (Servidor API)
-```bash
-python app.py
-```
-O servidor rodará em `http://localhost:5000`.
-
-### Acessar o Frontend
-Abra o arquivo `docs/index.html` em qualquer navegador ou use um servidor estático:
-```bash
-cd docs
-python -m http.server 8000
-```
-Acesse `http://localhost:8000`.
-
----
-
-## 🔑 Acesso Inicial (Admin)
-
-- **Usuário**: `admin`
-- **Senha Padrão**: `admin` (será solicitada a troca obrigatória no primeiro login para 8+ caracteres).
+- **Arquitetura Organizada**: Backend e Frontend separados para melhor manutenção.
+- **Autenticação Segura**: Utiliza **JWT (JSON Web Tokens)** para sessões seguras e expiráveis.
+- **Banco de Dados Relacional**: Persistência de usuários e perfis via **SQLite**.
+- **Gestão de Perfis**: Suporte a perfis **Team**, **PO**, **SM** e **Admin**.
+- **Segurança Avançada**:
+    - Senhas com Hashing seguro (PBKDF2).
+    - Troca obrigatória de senha padrão.
+    - Proteção contra ataques XSS e CSRF.
+    - Variáveis de ambiente para segredos sensíveis.
 
 ---
 
 ## 📂 Estrutura do Projeto
 
-- `backend/app.py`: Servidor Flask e rotas da API.
-- `backend/models.py`: Modelagem do banco de dados SQLAlchemy.
-- `requirements.txt`: Lista de dependências do projeto.
-- `.env`: Configurações sensíveis (não versionado).
-- `docs/`: Frontend da aplicação (HTML, CSS, JS).
-- `data/scrumway.db`: Arquivo do banco de dados SQLite.
+```text
+/scrumway
+  ├── backend/           # Lógica do Servidor (Python/Flask)
+  │   ├── app.py         # API principal
+  │   └── models.py      # Modelagem do Banco de Dados
+  ├── docs/              # Frontend (HTML, CSS, JS) - GitHub Pages
+  ├── data/              # Dados Locais (Banco SQLite)
+  ├── .env               # Configurações sensíveis (NÃO versionar)
+  ├── requirements.txt   # Dependências Python
+  └── README.md          # Documentação
+```
 
 ---
 
-## 🛡️ Segurança
+## 🛠️ Configuração e Instalação
 
-- Senhas são armazenadas no banco usando **Hashing Seguro** (PBKDF2).
-- Sessões administrativas são protegidas por tokens **JWT**.
-- O projeto ignora arquivos sensíveis no Git através do `.gitignore`.
+### 1. Preparar o Ambiente
+```bash
+git clone https://github.com/nadsonpaulo/ScrumWay.git
+cd ScrumWay
+pip install -r requirements.txt
+```
+
+### 2. Configurar Variáveis
+Crie o arquivo `.env` na raiz:
+```bash
+AUTH_SECRET=seu_segredo_aleatorio_aqui
+ADMIN_PASSWORD=admin
+```
+
+### 3. Iniciar o Sistema
+Inicie o backend:
+```bash
+python backend/app.py
+```
+O servidor estará ativo em `http://localhost:5000`.
+
+---
+
+## 🔑 Acesso Administrativo
+
+O usuário inicial é `admin` com a senha definida no seu `.env` (padrão `admin`). No primeiro login, o sistema exigirá a criação de uma senha forte de no mínimo 8 caracteres.
+
+---
+
+## 🌐 Deploy (Produção)
+
+- **Frontend**: A pasta `docs/` está pronta para o **GitHub Pages**.
+- **Backend**: O código é compatível com **Render**, **Railway** ou **PythonAnywhere**. 
+    - Lembre-se de configurar as variáveis de ambiente `AUTH_SECRET` e `ADMIN_PASSWORD` no painel da sua hospedagem.
 
 ---
 
 ## 📄 Licença
-Este projeto é para fins educacionais e de gestão ágil.
+Desenvolvido para gestão ágil e colaborativa.

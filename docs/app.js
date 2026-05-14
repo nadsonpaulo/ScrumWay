@@ -13,6 +13,7 @@ const defaultState = {
 const VAULT_PREFIX = 'scrumway_vault_';
 const SESSION_KEY = 'scrumway_active_session';
 const SALT = 'scrumway_salt_2024';
+const API_URL = 'http://localhost:5000/api';
 
 let state = { ...defaultState };
 let currentVaultPassword = '';
@@ -164,7 +165,7 @@ async function handleLogin(event) {
   }
 
   try {
-    const response = await fetch('http://localhost:5000/api/login', {
+    const response = await fetch(`${API_URL}/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password })
@@ -234,7 +235,7 @@ async function handleRegister(event) {
   if (password !== confirm) return showFlash('As senhas não coincidem.', 'danger');
 
   try {
-    const response = await fetch('http://localhost:5000/api/register', {
+    const response = await fetch(`${API_URL}/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, email, password })
@@ -333,7 +334,7 @@ function showView(v) {
 
 async function loadUsers() {
   try {
-    const response = await apiFetch('http://localhost:5000/api/admin/users');
+    const response = await apiFetch(`${API_URL}/admin/users`);
     const users = await response.json();
     elements.usersTableBody.innerHTML = users.map(user => `
       <tr>
@@ -397,7 +398,7 @@ window.submitForcePasswordChange = async () => {
     if (!password || password.length < 8) return showFlash('A nova senha deve ter no mínimo 8 caracteres.', 'danger');
 
     try {
-        const response = await apiFetch('http://localhost:5000/api/change-password', {
+        const response = await apiFetch(`${API_URL}/change-password`, {
             method: 'POST',
             body: JSON.stringify({ password })
         });
@@ -425,7 +426,7 @@ window.saveUserRole = async () => {
     const role = document.getElementById('editUserRole').value;
     
     try {
-        const response = await apiFetch(`http://localhost:5000/api/admin/users/${id}/role`, {
+        const response = await apiFetch(`${API_URL}/admin/users/${id}/role`, {
             method: 'PATCH',
             body: JSON.stringify({ role })
         });
@@ -450,7 +451,7 @@ window.saveUserPassword = async () => {
     if (!password || password.length < 8) return showFlash('Senha deve ter no mínimo 8 caracteres.', 'danger');
 
     try {
-        const response = await apiFetch(`http://localhost:5000/api/admin/users/${id}/reset-password`, {
+        const response = await apiFetch(`${API_URL}/admin/users/${id}/reset-password`, {
             method: 'POST',
             body: JSON.stringify({ password })
         });
@@ -470,7 +471,7 @@ window.saveUserPassword = async () => {
 window.deleteUser = async (id) => {
   if (!confirm('Tem certeza que deseja remover este usuário?')) return;
   try {
-    const response = await apiFetch(`http://localhost:5000/api/admin/users/${id}`, { method: 'DELETE' });
+    const response = await apiFetch(`${API_URL}/admin/users/${id}`, { method: 'DELETE' });
     if (response.ok) {
       showFlash('Usuário removido com sucesso.', 'success');
       loadUsers();
