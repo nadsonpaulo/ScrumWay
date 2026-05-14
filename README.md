@@ -1,99 +1,91 @@
-# ScrumWay Web
+# ScrumWay - Gestão Ágil
 
-Projeto convertido para uma aplicação web estática em **HTML/CSS/JavaScript** pronta para rodar no **GitHub Pages**.
+ScrumWay é uma aplicação de quadro SCRUM moderna, agora com suporte a banco de dados, perfis de acesso (Team, PO, SM, Admin) e segurança robusta via JWT.
 
-## Versão recomendada
+## 🚀 Novas Funcionalidades (v2.0)
 
-O aplicativo web estático está em `docs/index.html` e funciona totalmente no navegador usando `localStorage`.
+- **Backend Flask**: API robusta para gerenciamento de usuários e autenticação.
+- **Banco de Dados SQLite**: Armazenamento seguro de contas e perfis.
+- **Segurança JWT**: Autenticação via tokens (JSON Web Tokens) com expiração.
+- **Painel Administrativo**: Gestão de usuários, alteração de perfis e redefinição de senhas.
+- **Troca de Senha Obrigatória**: Segurança reforçada para contas com senhas padrão.
+- **Perfis de Acesso**: Suporte a perfis Team, Product Owner (PO) e Scrum Master (SM).
+- **Criptografia Client-side**: Os dados do quadro permanecem privados e criptografados no navegador do usuário.
 
-### Recursos
+---
 
-- Login / cadastro / recuperação de senha
-- Quadro SCRUM com colunas: STORIES, A FAZER, EM PROCESSO, REALIZADAS
-- Criação, edição, exclusão e movimentação de tarefas
-- Responsável e complexidade ajustáveis
-- Notas por usuário
-- Tema claro/escuro
-- Dados salvos localmente no navegador via `localStorage`
+## 🛠️ Requisitos
 
-## Como publicar no GitHub Pages
+- Python 3.8 ou superior
+- Pip (Gerenciador de pacotes do Python)
 
-1. Faça push do repositório para o GitHub.
-2. No repositório GitHub, abra `Settings` > `Pages`.
-3. Selecione a branch `master` e a pasta `/docs`.
-4. Salve e aguarde a publicação.
+---
 
-A página será servida a partir de `https://<seu-usuario>.github.io/<seu-repositorio>/`.
+## 📦 Instalação e Configuração
 
-## Como testar localmente
+### 1. Clonar o Repositório
+```bash
+git clone https://github.com/nadsonpaulo/ScrumWay.git
+cd ScrumWay
+```
 
-A forma mais simples é abrir `docs/index.html` no navegador ou rodar um servidor local na pasta `docs`:
+### 2. Instalar Dependências
+```bash
+pip install -r requirements.txt
+```
 
+### 3. Configurar Variáveis de Ambiente
+Crie um arquivo `.env` na raiz do projeto (use o `.env.example` como base):
+```bash
+AUTH_SECRET=seu_segredo_super_forte_aqui
+ADMIN_PASSWORD=admin
+```
+
+---
+
+## 🚦 Como Rodar
+
+### Iniciar o Backend (Servidor API)
+```bash
+python app.py
+```
+O servidor rodará em `http://localhost:5000`.
+
+### Acessar o Frontend
+Abra o arquivo `docs/index.html` em qualquer navegador ou use um servidor estático:
 ```bash
 cd docs
 python -m http.server 8000
 ```
+Acesse `http://localhost:8000`.
 
-Em seguida, acesse `http://localhost:8000`.
+---
 
-## Credenciais iniciais
+## 🔑 Acesso Inicial (Admin)
 
-- Usuário: `admin`
-- Senha: `123456`
+- **Usuário**: `admin`
+- **Senha Padrão**: `admin` (será solicitada a troca obrigatória no primeiro login para 8+ caracteres).
 
-## Observações
+---
 
-- A versão atual é uma aplicação web estática que roda no navegador.
-- Os dados do quadro são armazenados apenas no navegador atual via `localStorage`.
-- Um arquivo de credenciais criptografado pode ser usado para armazenar usuário e senha sem um banco de dados.
+## 📂 Estrutura do Projeto
 
-## Armazenamento seguro de credenciais
+- `app.py`: Servidor Flask e rotas da API.
+- `models.py`: Modelagem do banco de dados SQLAlchemy.
+- `requirements.txt`: Lista de dependências do projeto.
+- `.env`: Configurações sensíveis (não versionado).
+- `docs/`: Frontend da aplicação (HTML, CSS, JS).
+- `scrumway.db`: Arquivo do banco de dados SQLite (gerado automaticamente).
 
-O projeto agora inclui um sistema leve de credenciais criptografadas em `data/credentials.enc`.
-A chave secreta não deve ser armazenada no repositório; use a variável de ambiente `AUTH_SECRET`.
+---
 
-Para iniciar o arquivo de credenciais:
+## 🛡️ Segurança
 
-```bash
-copy .env.example .env
-setx AUTH_SECRET "seu_segredo_forte_aqui"
-python init_credentials.py
-```
+- Senhas são armazenadas no banco usando **Hashing Seguro** (PBKDF2).
+- Sessões administrativas são protegidas por tokens **JWT**.
+- O projeto ignora arquivos sensíveis no Git através do `.gitignore`.
 
-O arquivo criptografado será criado em `data/credentials.enc`.
+---
 
-Usuário padrão: `admin` / `123456`
-
-## Estrutura atual do projeto
-
-- `docs/index.html`
-- `docs/app.js`
-- `docs/style.css`
-- `auth_storage.py`
-- `init_credentials.py`
-- `data/credentials.enc`
-- `.env.example`
-- `README.md`
-- `package.json`
-- `.gitignore`
-
-## Como testar localmente
-
-A forma mais simples é abrir `docs/index.html` no navegador ou rodar um servidor local na pasta `docs`:
-
-```bash
-cd docs
-python -m http.server 8000
-```
-
-Em seguida, acesse `http://localhost:8000`.
-
-## Verificação de estrutura
-
-No diretório raiz do projeto, execute:
-
-```bash
-npm test
-```
-
-Isso valida se os arquivos principais estão presentes em `docs/`.
+## 📄 Licença
+Este projeto é para fins educacionais e de gestão ágil.
