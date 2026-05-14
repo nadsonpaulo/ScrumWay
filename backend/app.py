@@ -16,7 +16,8 @@ CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
 
 # Configurações de Segurança e Banco de Dados
 basedir = os.path.abspath(os.path.dirname(__file__))
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'scrumway.db')
+# O banco fica na pasta 'data' um nível acima do backend
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, '..', 'data', 'scrumway.db')
 app.config['SECRET_KEY'] = os.environ.get('AUTH_SECRET', 'scrumway_default_secret_key_2024')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 

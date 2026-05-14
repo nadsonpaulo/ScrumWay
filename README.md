@@ -70,12 +70,12 @@ Acesse `http://localhost:8000`.
 
 ## 📂 Estrutura do Projeto
 
-- `app.py`: Servidor Flask e rotas da API.
-- `models.py`: Modelagem do banco de dados SQLAlchemy.
+- `backend/app.py`: Servidor Flask e rotas da API.
+- `backend/models.py`: Modelagem do banco de dados SQLAlchemy.
 - `requirements.txt`: Lista de dependências do projeto.
 - `.env`: Configurações sensíveis (não versionado).
 - `docs/`: Frontend da aplicação (HTML, CSS, JS).
-- `scrumway.db`: Arquivo do banco de dados SQLite (gerado automaticamente).
+- `data/scrumway.db`: Arquivo do banco de dados SQLite.
 
 ---
 

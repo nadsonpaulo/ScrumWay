@@ -6,9 +6,8 @@ __pycache__/
 *.pyd
 .DS_Store
 .env
-scrumway.db
-sync_env.py
-update_admin.py
-*.db-journal
-*.db-wal
-*.db-shm
+data/*.db
+data/*.db-journal
+data/*.db-wal
+data/*.db-shm
+backend/__pycache__/
