@@ -6,4 +6,9 @@ __pycache__/
 *.pyd
 .DS_Store
 .env
-data/credentials.enc
+scrumway.db
+sync_env.py
+update_admin.py
+*.db-journal
+*.db-wal
+*.db-shm

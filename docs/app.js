@@ -2,12 +2,7 @@ const columns = ['stories','todo','inprogress','done'];
 const fibonacci = [0,1,1,2,3,5,8,13,21,34,55,89,144,233,377];
 const defaultState = {
   currentUser: null,
-  users: {
-    admin: { 
-      email: 'admin@example.com', 
-      password: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92' // Hash de '123456'
-    }
-  },
+  role: 'Team',
   notes: {},
   productVision: {},
   dod: {},
@@ -15,7 +10,7 @@ const defaultState = {
   tasks: []
 };
 
-const VAULT_KEY = 'scrumway_vault';
+const VAULT_PREFIX = 'scrumway_vault_';
 const SESSION_KEY = 'scrumway_active_session';
 const SALT = 'scrumway_salt_2024';
 
@@ -69,9 +64,9 @@ async function decryptData(encryptedBase64, password) {
 }
 
 async function persistVault() {
-  if (!currentVaultPassword) return;
+  if (!currentVaultPassword || !state.currentUser) return;
   const encrypted = await encryptData(state, currentVaultPassword);
-  localStorage.setItem(VAULT_KEY, encrypted);
+  localStorage.setItem(VAULT_PREFIX + state.currentUser, encrypted);
 }
 
 async function saveState() {
@@ -121,6 +116,9 @@ function init() {
     productVisionText: document.getElementById('productVisionText'),
     dodText: document.getElementById('dodText'),
     authButtons: document.getElementById('authButtons'),
+    adminBtn: document.getElementById('adminBtn'),
+    usersTableBody: document.getElementById('usersTableBody'),
+    adminSection: document.getElementById('adminSection'),
     counts: {
       stories: document.getElementById('countStories'),
       todo: document.getElementById('countTodo'),
@@ -145,6 +143,8 @@ function init() {
   document.getElementById('logoutBtn').onclick = logout;
   document.getElementById('decrementPriority').onclick = () => adjustPriority(-1);
   document.getElementById('incrementPriority').onclick = () => adjustPriority(1);
+  document.getElementById('backToBoardFromAdmin').onclick = () => showView('board');
+  document.getElementById('adminBtn').onclick = () => showView('admin');
   elements.btnTheme.onclick = toggleTheme;
   document.onclick = (e) => { if (!e.target.closest('.selection-popup') && !e.target.closest('.badge-clickable')) toggleSelectionPopup(false); };
   const theme = localStorage.getItem('scrumway_theme');
@@ -163,18 +163,63 @@ async function handleLogin(event) {
     return showFlash('Este usuário já possui uma sessão ativa em outra aba.', 'warning');
   }
 
-  const vault = localStorage.getItem(VAULT_KEY);
-  let loadedState = (vault) ? await decryptData(vault, password) : (username === 'admin' && password === '123456' ? { ...defaultState } : null);
+  try {
+    const response = await fetch('http://localhost:5000/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
 
-  if (!loadedState || !loadedState.users[username]) return showFlash('Credenciais inválidas ou Cofre bloqueado.', 'danger');
+    if (!response.ok) {
+      const errorData = await response.json();
+      return showFlash(errorData.error || 'Credenciais inválidas.', 'danger');
+    }
 
-  currentVaultPassword = password;
-  state = loadedState;
-  state.currentUser = username;
-  startSession(username);
-  await persistVault();
-  showFlash(`Cofre desbloqueado! Bem-vindo, ${username}!`, 'success');
-  showView('board');
+    const data = await response.json();
+    const vaultKey = VAULT_PREFIX + username;
+    const vault = localStorage.getItem(vaultKey);
+    
+    // Salva o token de acesso
+    sessionStorage.setItem('scrumway_token', data.token);
+
+    // Se não houver vault para este usuário, inicializa um estado padrão
+    let loadedState = (vault) ? await decryptData(vault, password) : { ...defaultState };
+
+    if (!loadedState) {
+        if (confirm('Sua senha foi validada pelo servidor, mas não conseguimos abrir o seu cofre local (provavelmente ele foi criado com uma senha anterior). \n\nDeseja DESCARTAR os dados locais antigos e iniciar um novo cofre com sua nova senha?')) {
+            loadedState = { ...defaultState };
+        } else {
+            return showFlash('Acesso cancelado. O cofre local permanece bloqueado.', 'warning');
+        }
+    }
+
+    currentVaultPassword = password;
+    state = loadedState;
+    state.currentUser = username;
+    state.role = data.user.role;
+    
+    startSession(username);
+    await persistVault();
+
+    // Verifica se precisa trocar a senha obrigatoriamente
+    if (data.user.force_password_change) {
+        const forceModal = new bootstrap.Modal(document.getElementById('forceChangePasswordModal'));
+        forceModal.show();
+        return; // Para o fluxo de login normal até trocar a senha
+    }
+    
+    // Mostra o botão de admin se for admin
+    if (state.role === 'admin') {
+        elements.adminBtn.classList.remove('hidden');
+    } else {
+        elements.adminBtn.classList.add('hidden');
+    }
+
+    showFlash(`Login realizado! Bem-vindo, ${username}!`, 'success');
+    showView('board');
+  } catch (err) {
+    showFlash('Erro ao conectar com o servidor. Verifique se o backend está rodando.', 'danger');
+  }
 }
 
 async function handleRegister(event) {
@@ -183,24 +228,56 @@ async function handleRegister(event) {
   const email = document.getElementById('registerEmail').value.trim().toLowerCase();
   const password = document.getElementById('registerPassword').value;
   const confirm = document.getElementById('registerConfirmPassword').value;
-  if (username.length < 3) return showFlash('Usuário muito curto.', 'danger');
-  if (password.length < 6) return showFlash('Senha deve ter no mínimo 6 caracteres.', 'danger');
-  if (password !== confirm) return showFlash('As senhas não coincidem.', 'danger');
-  if (localStorage.getItem(VAULT_KEY)) return showFlash('O sistema já possui um cofre.', 'warning');
 
-  state.users[username] = { email: escapeHtml(email), password: await hashPassword(password) };
-  currentVaultPassword = password;
-  await persistVault();
-  showFlash('Cofre criado com sucesso!', 'success');
-  showView('login');
+  if (username.length < 3) return showFlash('Usuário muito curto.', 'danger');
+  if (password.length < 8) return showFlash('Senha deve ter no mínimo 8 caracteres.', 'danger');
+  if (password !== confirm) return showFlash('As senhas não coincidem.', 'danger');
+
+  try {
+    const response = await fetch('http://localhost:5000/api/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, email, password })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      return showFlash(errorData.error || 'Erro ao registrar.', 'danger');
+    }
+
+    showFlash('Usuário cadastrado com sucesso! Agora você pode fazer login.', 'success');
+    showView('login');
+  } catch (err) {
+    showFlash('Erro ao conectar com o servidor.', 'danger');
+  }
 }
 
 function logout() { 
   if (sessionHeartbeat) clearInterval(sessionHeartbeat);
   localStorage.removeItem(SESSION_KEY);
+  sessionStorage.removeItem('scrumway_token');
   currentVaultPassword = ''; 
   state.currentUser = null; 
   showView('login'); 
+}
+
+// --- API Helpers ---
+
+async function apiFetch(url, options = {}) {
+  const token = sessionStorage.getItem('scrumway_token');
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    ...(options.headers || {})
+  };
+  
+  const response = await fetch(url, { ...options, headers });
+  if (response.status === 401) {
+    logout();
+    showFlash('Sessão expirada. Por favor, faça login novamente.', 'danger');
+    throw new Error('Unauthorized');
+  }
+  return response;
 }
 
 // --- Funções de UI ---
@@ -235,7 +312,165 @@ async function handleSaveNotes(e) { e.preventDefault(); state.notes[state.curren
 async function handleSaveProductVision(e) { e.preventDefault(); state.productVision[state.currentUser] = elements.productVisionText.value; await saveState(); showFlash('Visão salva.'); }
 async function handleSaveDod(e) { e.preventDefault(); state.dod[state.currentUser] = elements.dodText.value; await saveState(); showFlash('DoD salvo.'); }
 
-function showView(v) { document.querySelectorAll('.view-section').forEach(s => s.classList.add('hidden')); document.getElementById(`${v}Section`).classList.remove('hidden'); elements.authButtons.classList.toggle('hidden', v !== 'board'); if (v === 'board') renderBoard(); }
+function showView(v) { 
+  document.querySelectorAll('.view-section').forEach(s => s.classList.add('hidden')); 
+  document.getElementById(`${v}Section`).classList.remove('hidden'); 
+  elements.authButtons.classList.toggle('hidden', v !== 'board' && v !== 'admin'); 
+  if (v === 'board') renderBoard(); 
+  if (v === 'admin') loadUsers();
+}
+
+async function loadUsers() {
+  try {
+    const response = await apiFetch('http://localhost:5000/api/admin/users');
+    const users = await response.json();
+    elements.usersTableBody.innerHTML = users.map(user => `
+      <tr>
+        <td>${user.id}</td>
+        <td><strong>${escapeHtml(user.username)}</strong></td>
+        <td>${escapeHtml(user.email)}</td>
+        <td><span class="badge ${user.role === 'admin' ? 'bg-warning' : 'bg-info'} text-white">${escapeHtml(user.role === 'admin' ? 'Admin' : user.role)}</span></td>
+        <td class="text-end">
+          <div class="btn-group btn-group-sm">
+            <button class="btn btn-outline-primary" onclick="openManageUserModal(${user.id}, '${escapeHtml(user.username)}', '${escapeHtml(user.role)}')">Gerenciar</button>
+            ${user.username !== 'admin' ? `<button class="btn btn-outline-danger" onclick="deleteUser(${user.id})">Remover</button>` : ''}
+          </div>
+        </td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    showFlash('Erro ao carregar usuários.', 'danger');
+  }
+}
+
+window.openManageUserModal = (id, username, role) => {
+    document.getElementById('manageUserId').value = id;
+    document.getElementById('manageUsername').textContent = username;
+    document.getElementById('editUserRole').value = role;
+    document.getElementById('resetUserPassword').value = '';
+    
+    const modal = new bootstrap.Modal(document.getElementById('manageUserModal'));
+    modal.show();
+};
+
+window.generateRandomPassword = () => {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*";
+    let password = "";
+    for (let i = 0; i < 12; i++) {
+        password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    document.getElementById('resetUserPassword').value = password;
+};
+
+window.generateRegisterPassword = () => {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*";
+    let password = "";
+    for (let i = 0; i < 12; i++) {
+        password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    document.getElementById('registerPassword').value = password;
+    document.getElementById('registerConfirmPassword').value = password;
+};
+
+window.generateForcePassword = () => {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*";
+    let password = "";
+    for (let i = 0; i < 12; i++) {
+        password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    document.getElementById('forceNewPassword').value = password;
+};
+
+window.submitForcePasswordChange = async () => {
+    const password = document.getElementById('forceNewPassword').value;
+    if (!password || password.length < 8) return showFlash('A nova senha deve ter no mínimo 8 caracteres.', 'danger');
+
+    try {
+        const response = await apiFetch('http://localhost:5000/api/change-password', {
+            method: 'POST',
+            body: JSON.stringify({ password })
+        });
+        
+        if (response.ok) {
+            showFlash('Senha alterada com sucesso! Você já pode usar o sistema.', 'success');
+            currentVaultPassword = password; // Atualiza a senha do cofre para a nova
+            await persistVault(); // Salva o cofre com a nova senha
+            bootstrap.Modal.getInstance(document.getElementById('forceChangePasswordModal')).hide();
+            
+            // Continua para o board
+            if (state.role === 'admin') elements.adminBtn.classList.remove('hidden');
+            showView('board');
+        } else {
+            const data = await response.json();
+            showFlash(data.error || 'Erro ao alterar senha.', 'danger');
+        }
+    } catch (err) {
+        showFlash('Erro ao conectar com o servidor.', 'danger');
+    }
+};
+
+window.saveUserRole = async () => {
+    const id = document.getElementById('manageUserId').value;
+    const role = document.getElementById('editUserRole').value;
+    
+    try {
+        const response = await apiFetch(`http://localhost:5000/api/admin/users/${id}/role`, {
+            method: 'PATCH',
+            body: JSON.stringify({ role })
+        });
+        
+        if (response.ok) {
+            showFlash('Perfil atualizado com sucesso!', 'success');
+            loadUsers();
+            bootstrap.Modal.getInstance(document.getElementById('manageUserModal')).hide();
+        } else {
+            const data = await response.json();
+            showFlash(data.error || 'Erro ao atualizar perfil.', 'danger');
+        }
+    } catch (err) {
+        showFlash('Erro ao conectar com o servidor.', 'danger');
+    }
+};
+
+window.saveUserPassword = async () => {
+    const id = document.getElementById('manageUserId').value;
+    const password = document.getElementById('resetUserPassword').value;
+    
+    if (!password || password.length < 8) return showFlash('Senha deve ter no mínimo 8 caracteres.', 'danger');
+
+    try {
+        const response = await apiFetch(`http://localhost:5000/api/admin/users/${id}/reset-password`, {
+            method: 'POST',
+            body: JSON.stringify({ password })
+        });
+        
+        if (response.ok) {
+            showFlash('Senha redefinida com sucesso!', 'success');
+            bootstrap.Modal.getInstance(document.getElementById('manageUserModal')).hide();
+        } else {
+            const data = await response.json();
+            showFlash(data.error || 'Erro ao redefinir senha.', 'danger');
+        }
+    } catch (err) {
+        showFlash('Erro ao conectar com o servidor.', 'danger');
+    }
+};
+
+window.deleteUser = async (id) => {
+  if (!confirm('Tem certeza que deseja remover este usuário?')) return;
+  try {
+    const response = await apiFetch(`http://localhost:5000/api/admin/users/${id}`, { method: 'DELETE' });
+    if (response.ok) {
+      showFlash('Usuário removido com sucesso.', 'success');
+      loadUsers();
+    } else {
+      const data = await response.json();
+      showFlash(data.error || 'Erro ao remover usuário.', 'danger');
+    }
+  } catch (err) {
+    showFlash('Erro ao conectar com o servidor.', 'danger');
+  }
+};
 function showFlash(m, t = 'info') { elements.flashContainer.innerHTML = `<div class="alert alert-${t} alert-dismissible fade show shadow-sm" role="alert">${m}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>`; setTimeout(() => { const a = elements.flashContainer.querySelector('.alert'); if (a) a.remove(); }, 4000); }
 function escapeHtml(s) { return s.replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m])); }
 function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }

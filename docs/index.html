@@ -74,7 +74,10 @@
             </div>
             <div class="mb-3">
               <label class="form-label">Senha</label>
-              <input type="password" class="form-control" id="registerPassword" required>
+              <div class="input-group">
+                <input type="text" class="form-control" id="registerPassword" placeholder="Mín. 8 caracteres" required>
+                <button class="btn btn-outline-secondary" type="button" onclick="generateRegisterPassword()">Gerar</button>
+              </div>
             </div>
             <div class="mb-3">
               <label class="form-label">Confirmar senha</label>
@@ -98,7 +101,7 @@
         <p class="text-muted mb-0">Olá, <span id="boardUsername" class="fw-bold text-primary"></span>. Organize suas sprints com eficiência.</p>
       </div>
       <div class="d-flex gap-2">
-        <button class="btn btn-outline-secondary btn-sm" id="debugBtn">Debug</button>
+        <button class="btn btn-warning btn-sm hidden" id="adminBtn">Gerenciar Usuários</button>
         <button class="btn btn-outline-danger btn-sm" id="logoutBtn">Sair da Sessão</button>
       </div>
     </div>
@@ -196,6 +199,97 @@
       </div>
     </div>
   </section>
+
+  <section id="adminSection" class="view-section hidden">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <div>
+        <h2 class="mb-1">Gerenciamento de Usuários</h2>
+        <p class="text-muted">Painel administrativo para controle de contas.</p>
+      </div>
+      <button class="btn btn-outline-secondary btn-sm" id="backToBoardFromAdmin">Voltar ao Quadro</button>
+    </div>
+    <div class="card shadow-sm">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>ID</th>
+              <th>Usuário</th>
+              <th>Email</th>
+              <th>Perfil</th>
+              <th class="text-end">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="usersTableBody">
+            <!-- Usuários serão carregados aqui -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- Modal Gerenciar Usuário -->
+<div class="modal fade" id="manageUserModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="fw-bold">Gerenciar Usuário: <span id="manageUsername"></span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="manageUserId">
+        
+        <div class="mb-4">
+          <label class="form-label small fw-bold">Alterar Perfil</label>
+          <div class="d-flex gap-2">
+            <select class="form-select" id="editUserRole">
+              <option value="Team">Team</option>
+              <option value="PO">PO (Product Owner)</option>
+              <option value="SM">SM (Scrum Master)</option>
+              <option value="admin">Admin</option>
+            </select>
+            <button class="btn btn-primary" onclick="saveUserRole()">Salvar</button>
+          </div>
+        </div>
+
+        <hr class="my-4">
+
+        <div>
+          <label class="form-label small fw-bold">Redefinir Senha</label>
+          <div class="input-group">
+            <input type="text" class="form-control" id="resetUserPassword" placeholder="Nova senha (mín. 8 chars)">
+            <button class="btn btn-outline-secondary" onclick="generateRandomPassword()">Gerar</button>
+            <button class="btn btn-danger" onclick="saveUserPassword()">Redefinir</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Troca Obrigatória de Senha -->
+<div class="modal fade" id="forceChangePasswordModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="fw-bold text-danger">⚠️ Troca de Senha Obrigatória</h5>
+      </div>
+      <div class="modal-body">
+        <p>Por motivos de segurança, você deve alterar sua senha padrão antes de continuar.</p>
+        <div class="mb-3">
+          <label class="form-label small fw-bold">Nova Senha (mín. 8 caracteres)</label>
+          <div class="input-group">
+            <input type="text" class="form-control" id="forceNewPassword" placeholder="Digite sua nova senha">
+            <button class="btn btn-outline-secondary" onclick="generateForcePassword()">Gerar</button>
+          </div>
+        </div>
+        <div class="d-grid">
+          <button class="btn btn-primary" onclick="submitForcePasswordChange()">Salvar Nova Senha e Entrar</button>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div class="selection-popup" id="selectionPopup"></div>
